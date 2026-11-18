@@ -458,8 +458,13 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         const o = $('overlay');
         o.replaceChildren();
         o.hidden = key === 'none';
+        o.classList.toggle('result-overlay', !o.hidden && game.phase !== 'choice');
         if (game.phase === 'choice') renderAugments(o);
-        else if (!o.hidden) renderResult(o);
+        else if (!o.hidden) {
+            const panel = message('div', '', 'popup-actions result-panel');
+            renderResult(panel);
+            o.append(panel);
+        }
         if (!o.hidden && !menuPage) o.querySelector('button')?.focus({ preventScroll: true });
     }
     function setText(el, value) {

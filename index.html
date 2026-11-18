@@ -10,23 +10,41 @@
         <link rel="stylesheet" href="styles/front-menu.css" />
     </head>
     <body>
-        <main data-build="59">
+        <main data-build="60">
             <section id="home-screen" class="front-screen home-screen" aria-labelledby="home-title">
-                <div class="front-brand" aria-hidden="true">
-                    <img src="assets/duck-mark.svg" width="34" height="34" alt="" />
-                    BLOOM ARCADE
+                <div class="home-title">
+                    <img src="assets/duck-mark.svg" width="36" height="36" alt="" />
+                    <h1 id="home-title" tabindex="-1">덕 볼링</h1>
                 </div>
                 <div class="home-art"><img src="assets/duck-hero.svg" alt="" /></div>
-                <div class="home-title">
-                    <h1 id="home-title" tabindex="-1">덕 볼링</h1>
-                    <span lang="en" aria-hidden="true">DUCK BOWLING</span>
-                </div>
                 <div class="front-actions">
                     <button type="button" id="play" class="front-primary">
                         <span>플레이</span><span aria-hidden="true">→</span>
                     </button>
                     <button type="button" id="home-settings">
-                        <span aria-hidden="true">⚙</span> 설정
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            aria-hidden="true"
+                        >
+                            <circle
+                                cx="12"
+                                cy="12.1"
+                                r="2.8"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                            />
+                            <path
+                                d="M9.4 3h5.2l.6 2.5 2.2 1.3 2.5-.7 2.6 4.5-1.8 1.8v2.5l1.8 1.8-2.6 4.5-2.5-.7-2.2 1.3-.6 2.5H9.4l-.6-2.5-2.2-1.3-2.5.7-2.6-4.5 1.8-1.8v-2.5l-1.8-1.8 2.6-4.5 2.5.7 2.2-1.3z"
+                                transform="translate(1.8 .5) scale(.85)"
+                                stroke="currentColor"
+                                stroke-width="2.1"
+                                stroke-linejoin="round"
+                            />
+                        </svg>
+                        설정
                     </button>
                 </div>
             </section>
@@ -37,10 +55,12 @@
                 hidden
             >
                 <header class="front-header">
-                    <button type="button" id="maps-back" class="front-back">← 돌아가기</button>
-                    <img src="assets/duck-mark.svg" width="36" height="36" alt="" />
+                    <button type="button" id="maps-back" class="front-back">
+                        <span aria-hidden="true">←</span><span>돌아가기</span>
+                    </button>
+                    <h1 id="maps-title" tabindex="-1">맵 선택</h1>
+                    <img src="assets/duck-mark.svg" width="34" height="34" alt="" />
                 </header>
-                <h1 id="maps-title" tabindex="-1">맵 선택</h1>
                 <p id="map-notice" class="map-notice" role="status" hidden></p>
                 <div id="map-cards" class="map-cards"></div>
             </section>

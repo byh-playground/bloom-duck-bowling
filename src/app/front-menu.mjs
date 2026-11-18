@@ -3,12 +3,10 @@ import { ROUTES } from '../domain/arena.mjs';
 const CARD_ART = {
     grove: {
         src: 'assets/grove-card.svg',
-        kicker: '01 · WOODLAND',
         description: '숲속 공터와 갈림길',
     },
     storm: {
         src: 'assets/storm-card.svg',
-        kicker: '02 · STORM ROAD',
         description: '비 내리는 좁은 협곡',
         locked: '숲길 5구역 도달 시 해금',
     },
@@ -46,13 +44,15 @@ function createMapCard({ id, label, unlock }, unlocked, onStart) {
     const text = message('span', '', 'map-card-copy');
     const status = message('span', unlocked ? '플레이 가능' : '잠김', 'map-card-status');
     text.append(
-        message('span', art.kicker, 'map-card-kicker'),
+        status,
         message('strong', label),
         message('span', unlocked ? art.description : art.locked, 'map-card-detail'),
     );
     const arrow = message('span', '→', 'map-card-arrow');
     arrow.setAttribute('aria-hidden', 'true');
-    card.append(image, text, status);
+    const imagePane = message('span', '', 'map-card-image');
+    imagePane.append(image);
+    card.append(imagePane, text);
     if (unlocked) card.append(arrow);
     return card;
 }
