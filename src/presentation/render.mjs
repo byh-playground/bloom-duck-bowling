@@ -13,7 +13,6 @@ import {
 } from './pin-threat-render.mjs';
 import { drawExpeditionLandscape, FOREST_SHADE, STORM_SHADE } from './expedition-landscape.mjs';
 import { stormLandscape, stormFrontRail } from './storm-landscape.mjs';
-import { drawDuckBill } from './duck-bill.mjs';
 export { project, unproject } from './camera.mjs';
 const TAU = Math.PI * 2,
     clamp = (n, a, b) => Math.max(a, Math.min(b, n));
@@ -484,15 +483,10 @@ function enemy(c, e) {
         );
     }
 }
-function projectedHeight(depth, height) {
-    return (
-        Math.hypot(depth * Math.sin(CAMERA.pitch), height * Math.cos(CAMERA.pitch)) * CAMERA.scale
-    );
-}
 function orb(c, x, y, z, rx, ry, rz, color, shade, tilt = 0) {
     const p = project(x, y, z),
         w = rx * CAMERA.scale,
-        h = projectedHeight(ry, rz);
+        h = Math.hypot(ry * Math.sin(CAMERA.pitch), rz * Math.cos(CAMERA.pitch)) * CAMERA.scale;
     if (tilt) {
         c.save();
         c.translate(p.x, p.y);
@@ -528,73 +522,47 @@ function boss(c, b, held = null) {
     }
     const head = point(0, 12 + pose.lean * 12, 111),
         beak = point(0, 41 + pose.lean * 12, 106),
+        other = point(-46, -8, 54),
         parts = [];
     const bodyShell = pose.phase === 'recoil' ? point(0, 0, 58) : { ...body, z: body.z + 6 };
     const add = (o, draw) => parts.push({ depth: cameraDepth(o.x, o.y, o.z), draw });
     for (const foot of [pose.backFoot, pose.leadFoot])
         add(foot, () => orb(c, foot.x, foot.y, foot.z, 19, 27, 7, '#c99748', '#8b713e', tilt));
-    add(bodyShell, () => {
-        const width = 55 + 5 * drive,
-            depth = 46 + 8 * drive,
-            height = 62 - 15 * drive;
+    add(other, () => {
+        const p = q(other),
+            a = q(body);
+        line(c, [a, p], '#405c42', 22);
+        line(c, [a, p], '#c3924f', 16);
+    });
+    add(bodyShell, () =>
         orb(
             c,
             bodyShell.x,
             bodyShell.y,
             bodyShell.z,
-            width,
-            depth,
-            height,
+            55 + 5 * drive,
+            46 + 8 * drive,
+            62 - 15 * drive,
             b.flash > 0 ? '#efaa86' : '#e0ac56',
             '#a98146',
             tilt,
-        );
-        const view = face - CAMERA.yaw,
-            front = Math.sin(view),
-            wingFacing = -Math.cos(view);
-        if (front <= 0 && wingFacing <= 0) return;
-
-        const center = q(bodyShell),
-            w = width * CAMERA.scale,
-            h = projectedHeight(depth, height);
-        c.save();
-        c.translate(center.x, center.y);
-        c.rotate(tilt);
-        c.beginPath();
-        c.ellipse(0, 0, w - 1, h - 1, 0, 0, TAU);
-        c.clip();
-        if (front > 0) {
-            c.save();
-            c.globalAlpha *= Math.min(1, front * 3);
-            const chestX = w * Math.cos(view) * 0.43;
-            ellipse(c, chestX, h * 0.18, w * front * 0.69, h * 0.56, '#d8b16a');
-            ellipse(c, chestX, h * 0.13, w * front * 0.65, h * 0.52, '#f6d58a');
-            c.restore();
-        }
-        if (wingFacing > 0) {
-            c.rotate(-tilt);
-            c.translate(-center.x, -center.y);
-            c.globalAlpha *= Math.min(1, wingFacing * 1.6);
-            const edge = (side, forward, z) => q(point(side, forward, z));
-            const shoulder = edge(-40, 11, 62),
-                rise = edge(-45, 13, 74),
-                back = edge(-54, -24, 67),
-                tip = edge(-47, -35, 51),
-                fold = edge(-45, -30, 37),
-                underside = edge(-38, 2, 38);
-            c.beginPath();
-            c.moveTo(shoulder.x, shoulder.y);
-            c.bezierCurveTo(rise.x, rise.y, back.x, back.y, tip.x, tip.y);
-            c.bezierCurveTo(fold.x, fold.y, underside.x, underside.y, shoulder.x, shoulder.y);
-            c.closePath();
-            c.fillStyle = '#c99550';
-            c.fill();
-            c.strokeStyle = '#8f763f';
-            c.lineWidth = 1.35;
-            c.stroke();
-        }
-        c.restore();
-    });
+        ),
+    );
+    const belly = point(0, 31, 58);
+    add(belly, () =>
+        orb(
+            c,
+            belly.x,
+            belly.y,
+            belly.z,
+            40,
+            18 + 4 * drive,
+            44 - 10 * drive,
+            '#f6d58a',
+            '#d0ad66',
+            tilt,
+        ),
+    );
     add(head, () => {
         orb(
             c,
@@ -618,9 +586,7 @@ function boss(c, b, held = null) {
         const crown = [point(-16, 8, 141), point(0, 4, 153), point(16, 8, 142)].map(q);
         line(c, crown, '#5d8051', 7);
     });
-    add(beak, () =>
-        drawDuckBill(c, (side, forward, z) => q(point(side, forward + pose.lean * 12, z))),
-    );
+    add(beak, () => orb(c, beak.x, beak.y, beak.z, 20, 19, 8, '#dc9443', '#a37535', tilt));
     const arm = [q(pose.shoulder), q(pose.elbow), q(pose.hand)];
     add(pose.elbow, () => {
         line(c, arm, '#3f5c42', 21);
