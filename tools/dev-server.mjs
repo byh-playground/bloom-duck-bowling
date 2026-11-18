@@ -10,6 +10,7 @@ const TYPES = new Map([
     ['.mjs', 'text/javascript; charset=utf-8'],
     ['.css', 'text/css; charset=utf-8'],
     ['.svg', 'image/svg+xml'],
+    ['.ogg', 'audio/ogg'],
 ]);
 const PORT = Number(process.env.PORT ?? 4173);
 

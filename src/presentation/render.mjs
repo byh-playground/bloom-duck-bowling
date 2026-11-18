@@ -1,7 +1,7 @@
 import { arenaForRoute, rackEntrance, routeDefinition } from '../domain/arena.mjs';
 import { BALL_TYPES, predictRoll, prepareRoll, rollBounds } from '../domain/dynamics.mjs';
 import { shieldGuardUp } from '../domain/enemies.mjs';
-import { bowlerPose, bowlerRecoilPoint, releasePoint } from '../domain/bowler.mjs';
+import { bowlerPose, bowlerRecoilPoint, FOLLOW_TIME, releasePoint } from '../domain/bowler.mjs';
 // Original read-only 2.5D canvas renderer. No random draws or simulation mutation.
 import { CAMERA, project, cameraDepth, worldVectorToScreen } from './camera.mjs';
 import {
@@ -602,6 +602,31 @@ function boss(c, b, held = null) {
     parts.sort((a, b) => a.depth - b.depth);
     for (const p of parts) p.draw();
 }
+
+export function renderHomeDuck(c) {
+    const duck = {
+        ...CAMERA.worldCenter,
+        facing: -0.16,
+        delivery: { phase: 'follow', elapsed: FOLLOW_TIME * 0.3 },
+    };
+    const release = releasePoint(duck);
+    const rolling = {
+        x: release.x + Math.cos(duck.facing) * 28,
+        y: release.y + Math.sin(duck.facing) * 28,
+        r: release.radius,
+    };
+    const ground = project(duck.x, duck.y);
+    c.save();
+    c.translate(277, 263);
+    c.scale(1.5, 1.5);
+    c.translate(-ground.x, -ground.y);
+    shadow(c, duck, 55);
+    shadow(c, rolling, rolling.r * 0.9);
+    boss(c, duck);
+    ball(c, rolling);
+    c.restore();
+}
+
 // The vault shadow tracks the moving ball, not an unverified landing target.
 function ballVaultShadow(c, b) {
     const floor = project(b.x, b.y),
