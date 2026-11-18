@@ -61,6 +61,9 @@ try {
     home.hidden = false;
 
     if (!showcaseDemo) {
+        void import('./home-motion.mjs')
+            .then(({ installHomeMotion }) => installHomeMotion(home))
+            .catch((error) => console.warn('Duck Bowling title showcase could not load', error));
         void import('./showcase.mjs')
             .then(({ installBowlingShowcase }) => installBowlingShowcase())
             .catch((error) => console.warn('Duck Bowling showcase could not load', error));
