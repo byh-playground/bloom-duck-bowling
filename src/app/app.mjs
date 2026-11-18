@@ -24,32 +24,33 @@ const SHOT_LABELS = {
     spinner: ['회전 공', '깊은 훅'],
 };
 // QA can supply a real-physics driver and faster clock; the shipped entry uses defaults.
-export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
+export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDemo = false } = {}) {
     const $ = (id) => document.getElementById(id),
         canvas = $('game'),
         ctx = canvas.getContext('2d'),
         throwPad = $('throw-pad'),
         throwCtx = throwPad.getContext('2d');
     renderHomeDuck($('home-duck').getContext('2d'));
-    const audio = createBowlingAudio();
-    for (const type of ['pointerdown', 'keydown', 'click']) {
-        document.addEventListener(
-            type,
-            (event) => {
-                if (event.isTrusted) void audio.unlock();
-            },
-            { capture: true, passive: true },
-        );
-    }
+    const audio = showcaseDemo ? null : createBowlingAudio();
+    if (audio)
+        for (const type of ['pointerdown', 'keydown', 'click']) {
+            document.addEventListener(
+                type,
+                (event) => {
+                    if (event.isTrusted) void audio.unlock();
+                },
+                { capture: true, passive: true },
+            );
+        }
     window.addEventListener('pagehide', (event) => {
         if (!event.persisted) {
             loop.stop();
-            void audio.dispose();
+            void audio?.dispose();
         }
     });
     let storage = null;
     try {
-        storage = window.localStorage;
+        if (!showcaseDemo) storage = window.localStorage;
     } catch {
         // 저장이 차단된 브라우저에서도 이번 판은 메모리에서 실행한다.
     }
@@ -71,13 +72,16 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
             route,
             unlocks,
             expedition: true,
-            onEvent: (kind, impulse) => {
-                const strength = impulse === undefined ? 1 : Math.min(1, 0.35 + impulse / 500);
-                audio.play(kind, strength);
-            },
+            onEvent: audio
+                ? (kind, impulse) => {
+                      const strength =
+                          impulse === undefined ? 1 : Math.min(1, 0.35 + impulse / 500);
+                      audio.play(kind, strength);
+                  }
+                : undefined,
             shotSeed: seed ?? crypto.getRandomValues(new Uint32Array(1))[0],
         });
-    let profile = loadProfile(storage),
+    let profile = showcaseDemo ? { ...defaultProfile(), unlocks: ['storm'] } : loadProfile(storage),
         game = null,
         aim = null,
         recorded = false,
@@ -85,7 +89,9 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         menuPage = null,
         saveFailed = false,
         frameNumber = 0,
-        displayedShot;
+        displayedShot,
+        showcaseOpen = false,
+        mutedBeforeShowcase = false;
     const inputMetrics = [];
     const input = new BowlingInput(throwPad, {
         coordinateScale: 2,
@@ -93,7 +99,11 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         getBalls: () => game?.balls ?? [],
         getBoss: () => game?.boss,
         enabled: () =>
-            !menuPage && game?.phase === 'playing' && !game.boss.delivery && duckAimOpen(game.boss),
+            !showcaseOpen &&
+            !menuPage &&
+            game?.phase === 'playing' &&
+            !game.boss.delivery &&
+            duckAimOpen(game.boss),
         project,
         onAim: (a) => {
             if (a) for (const m of inputMetrics) if (m.firstMovementMs === null) m.cancelled = true;
@@ -104,7 +114,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
     });
     const movement = new MovementInput({
         stick: $('move-stick'),
-        enabled: () => !menuPage && game?.phase === 'playing',
+        enabled: () => !showcaseOpen && !menuPage && game?.phase === 'playing',
         onMove: (x, y) => game?.setMove(x, y),
         onDash: (event = {}) => {
             const at = performance.now(),
@@ -130,7 +140,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         },
     });
     function persistRun() {
-        if (recorded || !game) return false;
+        if (showcaseDemo || recorded || !game) return false;
         const stormWasUnlocked = profile.unlocks.includes('storm');
         profile = recordRun(profile, {
             stage: game.stageIndex + 1,
@@ -150,7 +160,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         for (const name of ['home', 'maps', 'game']) {
             $(name + '-screen').hidden = name !== screen;
         }
-        audio.setBackground(screen === 'game' ? 'playing' : 'home');
+        audio?.setBackground(screen === 'game' ? 'playing' : 'home');
     }
     function showHome() {
         setScreen('home');
@@ -173,8 +183,10 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         overlayKey = '';
         setScreen('game');
         update();
-        canvas.focus({ preventScroll: true });
-        loop.start();
+        if (!showcaseDemo) {
+            canvas.focus({ preventScroll: true });
+            loop.start();
+        }
     }
     function leaveRun() {
         const newStorm = game.elapsed > 1 && persistRun();
@@ -200,7 +212,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
     function showMenu(page, focusLabel = null) {
         const wasOpen = menuPage !== null;
         menuPage = page;
-        audio.setBackground(game ? (page ? 'paused' : 'playing') : 'home');
+        audio?.setBackground(game ? (page ? 'paused' : 'playing') : 'home');
         if (page) {
             if (!wasOpen) clearInput();
             menuPanel.scrollTop = 0;
@@ -250,19 +262,21 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
             focusOnBack: '설정',
             render(o) {
                 const controls = button('조작법', () => openControls(page));
-                const sound = button('소리', () => {
-                    audio.setMuted(!audio.muted);
+                o.append(controls);
+                if (audio) {
+                    const sound = button('소리', () => {
+                        audio.setMuted(!audio.muted);
+                        updateSoundToggle();
+                    });
+                    const updateSoundToggle = () => {
+                        sound.setAttribute('aria-pressed', String(!audio.muted));
+                        sound.textContent = audio.muted ? '소리 꺼짐' : '소리 켜짐';
+                    };
+                    sound.setAttribute('aria-label', '소리');
                     updateSoundToggle();
-                });
-                const updateSoundToggle = () => {
-                    sound.setAttribute('aria-pressed', String(!audio.muted));
-                    sound.textContent = audio.muted ? '소리 꺼짐' : '소리 켜짐';
-                };
-                sound.setAttribute('aria-label', '소리');
-                updateSoundToggle();
+                    o.append(sound);
+                }
                 o.append(
-                    controls,
-                    sound,
                     button('기록과 해금', () => openRecords(page)),
                     button('돌아가기', backFromMenu, 'subtle'),
                 );
@@ -396,8 +410,29 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         if (dismiss) backFromMenu();
     });
     document.addEventListener('visibilitychange', () => {
-        if (document.hidden && !menuPage && game?.phase === 'playing') openMenu();
+        if (
+            !showcaseDemo &&
+            !showcaseOpen &&
+            document.hidden &&
+            !menuPage &&
+            game?.phase === 'playing'
+        )
+            openMenu();
     });
+    if (audio) {
+        window.addEventListener('bloom-showcase-opened', () => {
+            showcaseOpen = true;
+            if (menuPage) showMenu(null);
+            clearInput();
+            mutedBeforeShowcase = audio.muted;
+            audio.setMuted(true);
+        });
+        window.addEventListener('bloom-showcase-closed', () => {
+            showcaseOpen = false;
+            loop.resetTiming();
+            audio.setMuted(mutedBeforeShowcase);
+        });
+    }
     function renderAugments(o) {
         o.append(
             message(
@@ -498,7 +533,8 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
             renderResult(panel);
             o.append(panel);
         }
-        if (!o.hidden && !menuPage) o.querySelector('button')?.focus({ preventScroll: true });
+        if (!showcaseDemo && !o.hidden && !menuPage)
+            o.querySelector('button')?.focus({ preventScroll: true });
     }
     function setText(el, value) {
         const next = String(value);
@@ -640,7 +676,8 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
             },
         },
         getInput: () => noInputPacket,
-        canAdvance: () => !menuPage && (game?.phase === 'playing' || game?.defeatAnimating),
+        canAdvance: () =>
+            !showcaseOpen && !menuPage && (game?.phase === 'playing' || game?.defeatAnimating),
         beforeFrame() {
             frameNumber++;
             movement.refresh();
@@ -659,6 +696,10 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
             }
         }
         render(ctx, game, aim ? { ...aim, detached: true } : null);
+        if (showcaseDemo) {
+            update();
+            return;
+        }
         const box = throwPad.getBoundingClientRect(),
             pw = Math.max(1, Math.round(box.width * 2)),
             ph = Math.max(1, Math.round(box.height * 2));
@@ -679,5 +720,17 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         update();
     }
     update();
-    return { audioReady: audio.ready, snapshot: () => game?.snapshot() ?? null };
+    return {
+        audioReady: audio?.ready,
+        snapshot: () => game?.snapshot() ?? null,
+        showcase: showcaseDemo
+            ? {
+                  start: startRun,
+                  game: () => game,
+                  frame(timestamp) {
+                      if (game) loop.frame(timestamp);
+                  },
+              }
+            : null,
+    };
 }

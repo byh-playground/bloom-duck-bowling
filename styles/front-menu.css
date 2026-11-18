@@ -136,6 +136,54 @@
     font-weight: 750;
 }
 
+.front-actions .bloom-showcase-link {
+    background: var(--duck-panel);
+    color: var(--duck-action-ink);
+    border-color: var(--duck-border);
+}
+
+[data-showcase-demo] {
+    background: #263d32;
+}
+
+[data-showcase-demo] main {
+    padding-top: max(64px, env(safe-area-inset-top));
+    padding-bottom: max(clamp(140px, 23dvh, 192px), env(safe-area-inset-bottom));
+}
+
+[data-showcase-demo] .duck-header,
+[data-showcase-demo] .move-controls {
+    display: none;
+}
+
+[data-showcase-demo] .arena {
+    background: transparent;
+}
+
+@media (max-height: 540px) {
+    [data-showcase-demo] main {
+        padding-top: max(53px, env(safe-area-inset-top));
+        padding-bottom: max(118px, env(safe-area-inset-bottom));
+    }
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+    [data-showcase-demo] main {
+        width: 55%;
+        margin-inline: 0 auto;
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
+    }
+
+    #bloom-showcase .bloom-showcase-foot {
+        inset: 53px 0 0 auto;
+        width: 45%;
+        align-content: center;
+        padding: 12px max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom))
+            12px;
+        background: none;
+    }
+}
+
 .front-actions .front-primary {
     display: flex;
     align-items: center;
