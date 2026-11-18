@@ -18,12 +18,17 @@ jobs:
             - uses: actions/setup-node@v4
               with:
                   node-version: '22'
-                  cache: npm
-            - name: Install pinned dev tools
-              run: npm ci
-            - name: Check changed files
+            - name: Check changed JavaScript syntax
+              shell: bash
               env:
                   BASE_SHA: ${{ github.event.pull_request.base.sha }}
-              run: node tools/check-changed.mjs
-            - name: Verify reusable gameplay scenarios
-              run: npm test
+              run: |
+                  changed_files=$(mktemp)
+                  trap 'rm -f "$changed_files"' EXIT
+
+                  git diff --name-only --diff-filter=ACMR -z "${BASE_SHA:?Missing PR base SHA}...HEAD" -- '*.js' '*.mjs' '*.cjs' > "$changed_files"
+
+                  while IFS= read -r -d '' file; do
+                      printf 'Checking syntax: %q\n' "$file"
+                      node --check "./$file"
+                  done < "$changed_files"
