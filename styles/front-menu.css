@@ -96,9 +96,11 @@
     font-size: 16px;
 }
 
-#home-settings span {
-    margin-right: 4px;
-    font-variant-emoji: text;
+#home-settings {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
 }
 
 .maps-screen {
