@@ -1,5 +1,5 @@
 // Connected forest artwork is grounded in the real room rectangles and gate seams.
-import { CAMERA, project, unproject } from './camera.mjs';
+import { CAMERA_VIEW, project, unproject } from './camera.mjs';
 import { drawStormRain } from './storm-landscape.mjs';
 const POINT = (x, y, z = 0) => project(x, y, z);
 const colors = [
@@ -282,13 +282,13 @@ export const STORM_SHADE = '#243746';
 const direction = (gate) =>
     gate.direction === 'north' ? [0, -1] : gate.direction === 'west' ? [-1, 0] : [1, 0];
 const hash = (x, y) => (Math.imul(x + 187, 73856093) ^ Math.imul(y - 241, 19349663)) >>> 0;
-function canopy(c, shift, arena, { ellipse }) {
+function canopy(c, shift, arena, { ellipse }, view) {
     // Continuous leaf masses, unrelated to room topology. Never draw a hidden room's floor or rails.
     const size = 84,
-        loX = Math.floor((-shift.x - 85) / size),
-        hiX = Math.ceil((CAMERA.width - shift.x + 85) / size),
-        loY = Math.floor((-shift.y - 85) / size),
-        hiY = Math.ceil((CAMERA.height - shift.y + 85) / size);
+        loX = Math.floor((view.left - shift.x - 85) / size),
+        hiX = Math.ceil((view.left + view.width - shift.x + 85) / size),
+        loY = Math.floor((view.top - shift.y - 85) / size),
+        hiY = Math.ceil((view.top + view.height - shift.y + 85) / size);
     for (let row = loY; row <= hiY; row++)
         for (let col = loX; col <= hiX; col++) {
             const h = hash(col, row),
@@ -383,13 +383,13 @@ function entryFalloff(c, exp, storm) {
     c.fillStyle = veil;
     c.fill();
 }
-function stormMist(c, shift, { polygon }) {
+function stormMist(c, shift, { polygon }, view) {
     const rock = ['#273b4b', '#2b4254', '#30495b', '#344e60'],
         step = 105;
-    const minX = Math.floor((-shift.x - step) / step),
-        maxX = Math.ceil((CAMERA.width - shift.x + step) / step);
-    const minY = Math.floor((-shift.y - step) / step),
-        maxY = Math.ceil((CAMERA.height - shift.y + step) / step);
+    const minX = Math.floor((view.left - shift.x - step) / step),
+        maxX = Math.ceil((view.left + view.width - shift.x + step) / step);
+    const minY = Math.floor((view.top - shift.y - step) / step),
+        maxY = Math.ceil((view.top + view.height - shift.y + step) / step);
     for (let row = minY; row <= maxY; row++)
         for (let col = minX; col <= maxX; col++) {
             const h = hash(col, row),
@@ -436,9 +436,15 @@ function stormFloor(c, room, { polygon, line, ellipse }) {
         ellipse(c, p.x, p.y, 20 + (i % 3) * 4, 4, '#aecddd30');
     }
 }
-export function drawExpeditionLandscape(c, exp, shift, inks, { storm = false, time = 0 } = {}) {
-    if (storm) stormMist(c, shift, inks);
-    else canopy(c, shift, exp.room.arena, inks);
+export function drawExpeditionLandscape(
+    c,
+    exp,
+    shift,
+    inks,
+    { storm = false, time = 0, view = CAMERA_VIEW } = {},
+) {
+    if (storm) stormMist(c, shift, inks, view);
+    else canopy(c, shift, exp.room.arena, inks, view);
     // All destination and earlier geometry remains hidden. Only a real entrance breaks the scenery.
     const room = exp.room,
         all = exp.entryGate ? [exp.entryGate, ...(exp.gates || [])] : exp.gates || [];
