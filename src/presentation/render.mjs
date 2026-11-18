@@ -1044,6 +1044,15 @@ function scoreFeedback(c, events, shift = { x: 0, y: 0 }) {
 }
 export const drawDepth = (o, type) =>
     cameraDepth(o.x, o.y, (o.recoil?.z ?? o.z ?? 0) + (type === 'boss' ? 58 : o.r || 0));
+export function expeditionCameraShift(expedition) {
+    return expedition?.room
+        ? worldVectorToScreen(
+              CAMERA.worldCenter.x - (expedition.cameraX ?? expedition.room.centerX),
+              CAMERA.worldCenter.y - (expedition.cameraY ?? expedition.room.centerY),
+          )
+        : null;
+}
+
 export function render(c, g, aim = null) {
     c.save();
     c.clearRect(0, 0, CAMERA.width, CAMERA.height);
@@ -1051,12 +1060,7 @@ export function render(c, g, aim = null) {
     c.translate(Math.sin((g.time || 0) * 47) * shake, Math.cos((g.time || 0) * 39) * shake * 0.6);
     const arena = g.arena ?? arenaForRoute(g.route),
         exp = g.expedition;
-    const shift = exp?.room
-        ? worldVectorToScreen(
-              CAMERA.worldCenter.x - (exp.cameraX ?? exp.room.centerX),
-              CAMERA.worldCenter.y - (exp.cameraY ?? exp.room.centerY),
-          )
-        : null;
+    const shift = expeditionCameraShift(exp);
     if (shift) {
         const storm = routeDefinition(g.route).landscape === 'storm';
         c.fillStyle = storm ? STORM_SHADE : FOREST_SHADE;
