@@ -1,5 +1,6 @@
+import { createLoop } from '@bloom-gamekit/simloop';
 import { routeDefinition } from '../domain/arena.mjs';
-import { STEP_SECONDS, MAX_FRAME_SECONDS, MAX_FRAME_STEPS } from '../domain/timing.mjs';
+import { STEP_SECONDS, TICK_RATE_HZ, MAX_FRAME_STEPS } from '../domain/timing.mjs';
 import { button, message, renderMapCards, STORM_UNLOCK_NOTICE } from './front-menu.mjs';
 import { CampaignGame, AUGMENTS, STAGES } from '../domain/campaign.mjs';
 import {
@@ -11,7 +12,8 @@ import {
 } from './progression.mjs';
 import { BowlingInput } from '../input/input.mjs';
 import { MovementInput } from '../input/movement-input.mjs';
-import { render, project } from '../presentation/render.mjs';
+import { render, project, renderHomeDuck } from '../presentation/render.mjs';
+import { createBowlingAudio } from '../presentation/audio.mjs';
 import { DUCK_COMBAT } from '../domain/combat-clock.mjs';
 import { duckAimOpen, duckDashOpen } from '../domain/duck-recoil.mjs';
 import { renderThrowPad } from '../presentation/throw-pad.mjs';
@@ -28,6 +30,23 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         ctx = canvas.getContext('2d'),
         throwPad = $('throw-pad'),
         throwCtx = throwPad.getContext('2d');
+    renderHomeDuck($('home-duck').getContext('2d'));
+    const audio = createBowlingAudio();
+    for (const type of ['pointerdown', 'keydown', 'click']) {
+        document.addEventListener(
+            type,
+            (event) => {
+                if (event.isTrusted) void audio.unlock();
+            },
+            { capture: true, passive: true },
+        );
+    }
+    window.addEventListener('pagehide', (event) => {
+        if (!event.persisted) {
+            loop.stop();
+            void audio.dispose();
+        }
+    });
     let storage = null;
     try {
         storage = window.localStorage;
@@ -52,19 +71,20 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
             route,
             unlocks,
             expedition: true,
+            onEvent: (kind, impulse) => {
+                const strength = impulse === undefined ? 1 : Math.min(1, 0.35 + impulse / 500);
+                audio.play(kind, strength);
+            },
             shotSeed: seed ?? crypto.getRandomValues(new Uint32Array(1))[0],
         });
     let profile = loadProfile(storage),
         game = null,
         aim = null,
-        last = 0,
-        acc = 0,
         recorded = false,
         overlayKey = '',
         menuPage = null,
         saveFailed = false,
         frameNumber = 0,
-        framePending = false,
         displayedShot;
     const inputMetrics = [];
     const input = new BowlingInput(throwPad, {
@@ -124,12 +144,13 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
     function clearInput() {
         movement.reset();
         input.cancel();
-        acc = 0;
+        loop.resetTiming();
     }
     function setScreen(screen) {
         for (const name of ['home', 'maps', 'game']) {
             $(name + '-screen').hidden = name !== screen;
         }
+        audio.setBackground(screen === 'game' ? 'playing' : 'home');
     }
     function showHome() {
         setScreen('home');
@@ -150,16 +171,16 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         displayedShot = undefined;
         recorded = false;
         overlayKey = '';
-        last = 0;
         setScreen('game');
         update();
         canvas.focus({ preventScroll: true });
-        queueFrame();
+        loop.start();
     }
     function leaveRun() {
         const newStorm = game.elapsed > 1 && persistRun();
         clearInput();
         game = null;
+        loop.stop();
         showMenu(null);
         showMaps(newStorm);
     }
@@ -179,6 +200,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
     function showMenu(page, focusLabel = null) {
         const wasOpen = menuPage !== null;
         menuPage = page;
+        audio.setBackground(game ? (page ? 'paused' : 'playing') : 'home');
         if (page) {
             if (!wasOpen) clearInput();
             menuPanel.scrollTop = 0;
@@ -196,7 +218,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
                 menuDialog.showModal();
             } else preferred.focus({ preventScroll: true });
         } else if (wasOpen) {
-            last = 0;
+            loop.resetTiming();
             menuDialog.close();
         }
         update();
@@ -228,8 +250,19 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
             focusOnBack: '설정',
             render(o) {
                 const controls = button('조작법', () => openControls(page));
+                const sound = button('소리', () => {
+                    audio.setMuted(!audio.muted);
+                    updateSoundToggle();
+                });
+                const updateSoundToggle = () => {
+                    sound.setAttribute('aria-pressed', String(!audio.muted));
+                    sound.textContent = audio.muted ? '소리 꺼짐' : '소리 켜짐';
+                };
+                sound.setAttribute('aria-label', '소리');
+                updateSoundToggle();
                 o.append(
                     controls,
+                    sound,
                     button('기록과 해금', () => openRecords(page)),
                     button('돌아가기', backFromMenu, 'subtle'),
                 );
@@ -381,7 +414,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
                 () => {
                     if (game.chooseAugment(option.id)) {
                         overlayKey = '';
-                        acc = 0;
+                        loop.resetTiming();
                         update();
                     }
                 },
@@ -422,7 +455,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
                     () => {
                         if (game.continueEndless()) {
                             overlayKey = '';
-                            acc = 0;
+                            loop.resetTiming();
                             movement.reset();
                             input.cancel();
                             update();
@@ -584,35 +617,37 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         )
             movement.repeatDash();
     }
-    function queueFrame() {
-        if (framePending) return;
-        framePending = true;
-        requestAnimationFrame(frame);
-    }
-    function frame(now) {
-        framePending = false;
-        if (!game) return;
-        frameNumber++;
-        movement.refresh();
-        const dt = last ? Math.min(MAX_FRAME_SECONDS, (now - last) / 1000) : 0;
-        last = now;
-        if (!menuPage && game?.phase === 'playing') {
-            acc += dt * stepRate;
-            let count = 0;
-            while (
-                acc >= STEP_SECONDS &&
-                count++ < Math.max(MAX_FRAME_STEPS, Math.ceil(stepRate * MAX_FRAME_STEPS))
-            ) {
-                beforeStep?.(game);
-                repeatHeldDash();
-                game.step(STEP_SECONDS);
-                acc -= STEP_SECONDS;
-                if (game.phase !== 'playing') {
-                    acc = 0;
-                    break;
+    const tickAdvanced = { status: 'advanced' };
+    const noInputPacket = new Uint8Array(0);
+    const loop = createLoop({
+        session: {
+            profile: {
+                tickRate: TICK_RATE_HZ * stepRate,
+                maxCatchupSteps: Math.max(MAX_FRAME_STEPS, Math.ceil(stepRate * MAX_FRAME_STEPS)),
+            },
+            pace: 1,
+            poll() {},
+            releaseInput: clearInput,
+            advance() {
+                if (game.phase === 'playing') {
+                    beforeStep?.(game);
+                    repeatHeldDash();
+                    game.step(STEP_SECONDS);
+                } else {
+                    game.stepDefeat(STEP_SECONDS / stepRate);
                 }
-            }
-        } else if (!menuPage && game.defeatAnimating) game.stepDefeat(dt);
+                return tickAdvanced;
+            },
+        },
+        getInput: () => noInputPacket,
+        canAdvance: () => !menuPage && (game?.phase === 'playing' || game?.defeatAnimating),
+        beforeFrame() {
+            frameNumber++;
+            movement.refresh();
+        },
+        render: renderFrame,
+    });
+    function renderFrame() {
         for (const m of inputMetrics) {
             if (
                 !m.cancelled &&
@@ -642,7 +677,6 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
             keyboard: !!aim && input.id === null,
         });
         update();
-        queueFrame();
     }
     update();
     return { snapshot: () => game?.snapshot() ?? null };

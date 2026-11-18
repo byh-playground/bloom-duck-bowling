@@ -8,15 +8,26 @@
         <link rel="icon" type="image/svg+xml" href="assets/duck-mark.svg" />
         <link rel="stylesheet" href="styles/game.css" />
         <link rel="stylesheet" href="styles/front-menu.css" />
+        <script type="importmap">
+            {
+                "imports": {
+                    "@bloom-gamekit/audio": "https://cdn.jsdelivr.net/gh/byh-playground/bloom-gamekit@68456934188ff73905d6de0597b8733eec1641eb/audio.js",
+                    "@bloom-gamekit/simloop": "https://cdn.jsdelivr.net/gh/byh-playground/bloom-gamekit@68456934188ff73905d6de0597b8733eec1641eb/simloop.js"
+                }
+            }
+        </script>
     </head>
     <body>
-        <main data-build="60">
+        <main data-build="61">
             <section id="home-screen" class="front-screen home-screen" aria-labelledby="home-title">
                 <div class="home-title">
                     <img src="assets/duck-mark.svg" width="36" height="36" alt="" />
                     <h1 id="home-title" tabindex="-1">덕 볼링</h1>
                 </div>
-                <div class="home-art"><img src="assets/duck-hero.svg" alt="" /></div>
+                <div class="home-art">
+                    <img src="assets/duck-hero.svg" alt="" />
+                    <canvas id="home-duck" width="640" height="355" aria-hidden="true"></canvas>
+                </div>
                 <div class="front-actions">
                     <button type="button" id="play" class="front-primary">
                         <span>플레이</span><span aria-hidden="true">→</span>

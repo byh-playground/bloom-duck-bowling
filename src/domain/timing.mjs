@@ -1,11 +1,11 @@
 // 한 틱 설정에서 입력, 시뮬레이션, 투구 예측의 간격을 파생한다.
-const TICK_RATE_HZ = 60;
+export const TICK_RATE_HZ = 60;
 const SUBSTEPS = 2;
 export const MAX_FRAME_MS = 100;
 export const STEP_SECONDS = 1 / TICK_RATE_HZ;
 export const PHYSICS_STEP_SECONDS = STEP_SECONDS / SUBSTEPS;
 export const MAX_FRAME_SECONDS = MAX_FRAME_MS / 1000;
-export const MAX_FRAME_STEPS = Math.round(MAX_FRAME_SECONDS / STEP_SECONDS);
+export const MAX_FRAME_STEPS = Math.round(MAX_FRAME_SECONDS * TICK_RATE_HZ);
 
 export const ENEMY_TIMING = {
     approach: 3.2,

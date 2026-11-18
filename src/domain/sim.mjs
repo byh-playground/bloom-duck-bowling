@@ -34,10 +34,12 @@ export class BowlingGame {
             autoWaves = true,
             duration = 60,
             arena = ARENA,
+            onEvent,
             home = { x: 300, y: 630, ballY: 790 },
         } = {},
     ) {
         this.arena = arena;
+        this.onEvent = onEvent;
         this.dashCapacity = 2;
         this.dashCharges = this.dashCapacity;
         this.dashOnly = false;
@@ -182,6 +184,7 @@ export class BowlingGame {
         b.moving = true;
         this.dashStarts = (this.dashStarts || 0) + 1;
         this.lastDash = { time: this.time, x: b.x, y: b.y, dx: b.dashX, dy: b.dashY };
+        this.onEvent?.('dash');
         return true;
     }
 
@@ -208,6 +211,7 @@ export class BowlingGame {
             startDuckRecoil(this, impact);
         } else b.damageGap = this.threatMode ? 0.22 : 0;
         this.stats.bossDamage += taken;
+        this.onEvent?.('duckHit');
         return true;
     }
     random() {
@@ -439,6 +443,7 @@ export class BowlingGame {
                         time: this.time,
                     };
                     this.fx('shot', h.x, h.y, 0, 24);
+                    this.onEvent?.('release');
                     b.heldBallId = null;
                     d.phase = 'follow';
                     d.elapsed = 0;
@@ -485,6 +490,7 @@ export class BowlingGame {
         });
         this.stats.pickups++;
         this.lastPickup = event;
+        this.onEvent?.('pickup');
         this.fx('pickup', event.x, event.y, 12, 28, '#9ce4d0', '+1 회수');
         this.syncHand();
         return true;
@@ -569,6 +575,7 @@ export class BowlingGame {
             this.fx('ko', u.x, u.y, u.z + 20, 16, '#f4ba77');
         }
         this.shake = Math.max(this.shake, Math.min(5, impulse * 0.006));
+        if (shot != null) this.onEvent?.(depth ? 'pinChain' : 'pinHit', impulse);
     }
     ballContact(b, u) {
         if (u.hp <= 0 || (!b.vault && u.z > 60) || b.vault?.pinId === u.id) return;
@@ -607,7 +614,10 @@ export class BowlingGame {
             u.vx += nx * closing * 0.12;
             u.vy += ny * closing * 0.12;
             this.fx('hit', u.x, u.y, 15, 20, '#b5cfdf');
-            if (closing > MEANINGFUL_BALL_IMPACT) startPinMagnet(this, b, u);
+            if (closing > MEANINGFUL_BALL_IMPACT) {
+                this.onEvent?.('pinBlock');
+                startPinMagnet(this, b, u);
+            }
             return impact;
         }
         const impulse =

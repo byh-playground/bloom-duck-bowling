@@ -108,6 +108,7 @@ export class CampaignGame extends BowlingGame {
             pace = BATTLE_PACE,
             shotSeed = seed,
             expedition = false,
+            onEvent,
         } = {},
     ) {
         const ACTIVE_ROUTE = unlockedRoute(route, unlocks);
@@ -116,6 +117,7 @@ export class CampaignGame extends BowlingGame {
             duration: Infinity,
             arena: ACTIVE_ROUTE.arena,
             home: ACTIVE_ROUTE.home,
+            onEvent,
         });
         this.duckBounds = manualBounds(this.arena);
         this.controlMode = 'manual';
@@ -523,6 +525,7 @@ export class CampaignGame extends BowlingGame {
             !bombResolving
         ) {
             this.stageClears = this.stageIndex + 1;
+            this.onEvent?.('clear');
             if (this.stageIndex === STAGES.length - 1) {
                 this.phase = 'won';
                 this.choices = [];
@@ -572,6 +575,7 @@ export class CampaignGame extends BowlingGame {
         )
             return;
         this.stageClears = this.stageIndex + 1;
+        this.onEvent?.('clear');
         if (this.stageClears === e.roomCount) {
             e.phase = 'won';
             this.phase = 'won';
