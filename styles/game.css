@@ -52,15 +52,13 @@ h1 {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    min-height: 44px;
-    padding: 0 12px;
-    border: 1px solid #bbc8ac;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
     border-radius: 10px;
-    background: #f6f4e5;
+    background: transparent;
     color: #405e45;
-    font-size: 13px;
-    font-weight: 750;
 }
 
 #menu-dialog {
