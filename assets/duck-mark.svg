@@ -1,11 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-    <rect x="1" y="1" width="62" height="62" rx="17" fill="#f9e6ac" stroke="#334f41" stroke-width="2"/>
-    <path d="M12 32c0-13 8-20 19-20s19 8 19 19c0 12-8 19-19 19-12 0-19-8-19-18Z" fill="#edbf66" stroke="#334f41" stroke-width="3.5"/>
-    <path d="M25 14c-1-6 5-9 11-8-1 5-4 8-11 8Z" fill="#81a970" stroke="#334f41" stroke-width="2.5" stroke-linejoin="round"/>
-    <path d="M35 32c3-4 12-4 15 0 4 5-1 10-8 10-6 0-11-4-7-10Z" fill="#e99146" stroke="#334f41" stroke-width="2.5"/>
-    <circle cx="27" cy="29" r="2.6" fill="#294238"/>
-    <ellipse cx="24" cy="36" rx="4" ry="2.3" fill="#f5a489"/>
-    <circle cx="47" cy="47" r="12" fill="#6e8cba" stroke="#334f41" stroke-width="3"/>
-    <path d="M41 48c0-4 2-6 5-7" fill="none" stroke="#aec8e5" stroke-linecap="round" stroke-width="2"/>
-    <path d="M49 43h.01M53 47h.01m-5 1h.01" stroke="#263d56" stroke-linecap="round" stroke-width="2.5"/>
+    <rect x="1" y="1" width="62" height="62" rx="13" fill="#dbe3ca" stroke="#a0ad90" stroke-width="2"/>
+    <ellipse cx="29" cy="44" rx="20" ry="7" fill="#a0ae86"/>
+    <path d="M15 35q-5 4-4 9c3 5 11 9 19 7 12-2 17-9 14-17-4-8-23-8-29 1Z" fill="#e0ac56" stroke="#344f40" stroke-width="2"/>
+    <ellipse cx="32" cy="39" rx="12" ry="11" fill="#f6d58a"/>
+    <ellipse cx="30" cy="25" rx="15" ry="14" fill="#bd9553" stroke="#344f40" stroke-width="2"/>
+    <ellipse cx="28" cy="23" rx="13" ry="11" fill="#edc270"/>
+    <path d="m22 13 7-4 7 3" fill="none" stroke="#5d8051" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <ellipse cx="31" cy="23" rx="1.6" ry="2.5" fill="#2e493b"/>
+    <ellipse cx="38" cy="22" rx="1.4" ry="2.1" fill="#2e493b"/>
+    <ellipse cx="40" cy="29" rx="8" ry="4.3" fill="#dc9443" stroke="#344f40" stroke-width="1.7"/>
+    <circle cx="47" cy="46" r="11" fill="#e6c583" stroke="#344f40" stroke-width="2"/>
+    <path d="M38 50q10 5 17-5a9 9 0 0 1-17 5Z" fill="#b99958"/>
+    <path d="M42 54q7 0 10-15" fill="none" stroke="#82976a" stroke-width="2" stroke-linecap="round"/>
+    <ellipse cx="44" cy="42" rx="3.4" ry="1.6" fill="#fff5d8" opacity=".66"/>
 </svg>

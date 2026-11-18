@@ -1,7 +1,20 @@
 :root {
+    --duck-bg: #e8e9d8;
+    --duck-ink: #304d3d;
+    --duck-muted-ink: #52664c;
+    --duck-action-ink: #405e45;
+    --duck-panel: #f4f3e4;
+    --duck-button: #f6f2df;
+    --duck-primary: #426745;
+    --duck-primary-ink: #fff0c6;
+    --duck-border: #b6c6a6;
+    --duck-rail: #a9ba96;
+    --duck-arena: #d8e2c9;
+    --duck-hud: #dbe3ca;
+    --duck-focus: #906324;
     font-family: ui-rounded, 'Apple SD Gothic Neo', system-ui, sans-serif;
-    color: #304d3d;
-    background: #e8e9d8;
+    color: var(--duck-ink);
+    background: var(--duck-bg);
 }
 
 * {
@@ -21,7 +34,7 @@ button {
 button:focus-visible,
 canvas:focus-visible,
 #move-stick:focus-visible {
-    outline: 2px solid #906324;
+    outline: 2px solid var(--duck-focus);
     outline-offset: -3px;
 }
 
@@ -58,7 +71,7 @@ h1 {
     border: 0;
     border-radius: 10px;
     background: transparent;
-    color: #405e45;
+    color: var(--duck-action-ink);
 }
 
 #menu-dialog {
@@ -67,15 +80,15 @@ h1 {
         100dvh - max(16px, env(safe-area-inset-top)) - max(16px, env(safe-area-inset-bottom))
     );
     padding: 0;
-    border: 1px solid #a9ba96;
+    border: 1px solid var(--duck-rail);
     border-radius: 19px;
-    background: #f4f3e4;
-    color: #304d3d;
-    box-shadow: 0 14px 48px #15241855;
+    background: var(--duck-panel);
+    color: var(--duck-ink);
+    box-shadow: 0 8px 26px #263b2a42;
     overflow: hidden;
 }
 #menu-dialog::backdrop {
-    background: #18281eb8;
+    background: #263b2a90;
 }
 #menu-panel {
     display: flex;
@@ -96,7 +109,7 @@ h1 {
 #menu-panel p,
 #menu-panel small {
     margin: 0;
-    color: #52664c;
+    color: var(--duck-muted-ink);
     font-size: 13px;
     line-height: 1.5;
     white-space: pre-line;
@@ -106,8 +119,8 @@ h1 {
     font-size: 14px;
 }
 #menu-panel > button[aria-current='true'] {
-    background: #dbe3ca;
-    border-color: #b6c6a6;
+    background: var(--duck-hud);
+    border-color: var(--duck-border);
     color: #435947;
     cursor: default;
 }
@@ -130,7 +143,7 @@ h1 {
     gap: 8px;
     min-height: 30px;
     padding: 4px 8px;
-    background: #dbe3ca;
+    background: var(--duck-hud);
     border-radius: 9px;
 }
 .round-info {
@@ -184,7 +197,7 @@ h1 {
     overflow: hidden;
     container-type: size;
     border-radius: 14px;
-    background: #d8e2c9;
+    background: var(--duck-arena);
 }
 #game {
     display: block;
@@ -222,28 +235,28 @@ h1 {
     line-height: 1.45;
 }
 #overlay small {
-    color: #52664c;
+    color: var(--duck-muted-ink);
 }
 .popup-actions > button {
     flex: none;
     min-height: 42px;
     width: 100%;
     padding: 8px 10px;
-    border: 1px solid #b6c6a6;
+    border: 1px solid var(--duck-border);
     border-radius: 9px;
-    background: #f6f2df;
-    color: #405e45;
+    background: var(--duck-button);
+    color: var(--duck-action-ink);
     font-weight: 700;
     font-size: 12px;
 }
 .popup-actions > button.primary {
-    background: #426745;
-    color: #fff0c6;
+    background: var(--duck-primary);
+    color: var(--duck-primary-ink);
 }
 .popup-actions > button.subtle {
     background: transparent;
     border-color: transparent;
-    color: #52664c;
+    color: var(--duck-muted-ink);
 }
 .popup-actions > button.danger {
     color: #a04538;
@@ -392,7 +405,7 @@ h1 {
     white-space: nowrap;
 }
 #shot-trait {
-    color: #52664c;
+    color: var(--duck-muted-ink);
     line-height: 1.15;
     word-break: keep-all;
 }

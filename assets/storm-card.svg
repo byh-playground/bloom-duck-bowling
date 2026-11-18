@@ -1,12 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 218">
-    <rect width="480" height="218" fill="#8197bd"/>
-    <path d="M0 27c56-14 88-8 142 4s99 5 149-7 115-25 189-11v42c-52-3-100-3-165 8s-145-1-213-13S36 48 0 60Z" fill="#61779f"/>
-    <path d="M0 108 51 63l69 21 42 44 49 6 30 30 30-38 50-18 46-35 58-17 55 29v133H0Z" fill="#687999"/>
-    <path d="M235 218c-12-15-24-24-18-32 4-5 24-12 23-17-1-3-11-6-12-9l22 3c18 9-6 16-6 22 0 7 18 16 28 33Z" fill="#afaccc"/>
-    <path d="M0 96 44 75l36 21 31 15 22 28 42 10 29 39-15 30H0Z" fill="#4b5c78"/>
-    <path d="M0 133 47 105l43 18 23 35 45 9-10 27 32 24H0Z" fill="#394b64"/>
-    <path d="m480 84-47-22-51 18-28 26-49 22-32 43 21 18-7 29h193Z" fill="#536381"/>
-    <path d="M480 134 428 102l-37 21-19 31-51 21 16 43h143Z" fill="#3b4c67"/>
-    <path d="m275 39-27 39 18-2-15 31 41-44-23 2 9-26Z" fill="#f6dfa0"/>
-    <path d="m65 39-13 20m102-10-14 22m59 5-15 25m155-53-12 19m98-24-15 24M88 138l-11 17m315-9-13 21m62-3-13 22m-251-44-13 20" stroke="#b8c8e2" stroke-linecap="round" stroke-width="3" opacity=".7"/>
+    <defs>
+        <g id="stone">
+            <path d="m-19 3 8-17 24-3 11 12-3 12-24 5Z" fill="#30465b"/>
+            <path d="m-19 3 8-17 24-3 11 12-15 1-12 6Z" fill="#617c8d"/>
+            <path d="m-10-13 23-4 6 7-14-2Z" fill="#a7c0d0" opacity=".5"/>
+        </g>
+    </defs>
+    <path fill="#243746" d="M0 0h480v218H0z"/>
+    <path d="m121 0-6 20 26 27-11 26-17 38 10 25-20 32-14 50h296l5-23-11-26 18-23-13-28 15-39-9-21 14-25-10-33Z" fill="#355163"/>
+    <path d="m177-15 161 9-8 46 19 1-31 194-191-9 32-192 9 1Z" fill="#526b80"/>
+    <path d="m174 8 161 9-3 15-160-7Zm-22 57 192 10-4 22-192-10Zm-10 57 192 10-4 22-192-11Zm-9 56 192 12-4 21-192-10Z" fill="#607b8e"/>
+    <path d="m177-15-9 50-9-1-32 192m211-232-8 46 19 1-31 194" fill="none" stroke="#3d5b70" stroke-width="9"/>
+    <path d="m177-15-9 50-9-1-32 192m211-232-8 46 19 1-31 194" fill="none" stroke="#b2c8d6" stroke-width="3.5"/>
+    <path d="m170 35 160 5" stroke="#9ecddc" stroke-width="12" opacity=".25"/>
+    <path d="m170 35 160 5" stroke="#d8f3ff" stroke-width="2.5" stroke-dasharray="5 7"/>
+    <g fill="#e1f8ff" stroke="#35536a" stroke-width="2">
+        <ellipse cx="171" cy="35" rx="6" ry="4"/><ellipse cx="330" cy="40" rx="6" ry="4"/>
+    </g>
+    <use href="#stone" x="128" y="23"/><use href="#stone" x="115" y="95"/>
+    <use href="#stone" x="108" y="159"/><use href="#stone" x="362" y="27"/>
+    <use href="#stone" x="378" y="82"/><use href="#stone" x="358" y="151"/><use href="#stone" x="348" y="197"/>
+    <g fill="#8baabc" opacity=".36">
+        <ellipse cx="186" cy="84" rx="17" ry="4"/><ellipse cx="290" cy="126" rx="19" ry="5"/>
+        <ellipse cx="186" cy="175" rx="16" ry="4"/><ellipse cx="287" cy="192" rx="12" ry="3"/>
+    </g>
+    <g fill="none" stroke="#c5d8e1" stroke-linecap="round" opacity=".54">
+        <path d="m68 26-9 16m42 6-11 17m98-45-10 17m77 39-11 19m-31 4-11 19m91-52-10 14m87-62-9 17m71 13-12 20m-50 44-12 20m70 16-11 19m-68-22-11 19m-66-27-12 20m-45-16-9 16m-70-15-12 20m-48-26-9 15m19 29-11 18m116-7-11 17m103-18-11 17m95-25-12 20" stroke-width="2"/>
+        <path d="M178 178a13 3 0 1 0 25 0 13 3 0 1 0-25 0m89-49a17 4 0 1 0 34 0 17 4 0 1 0-34 0"/>
+    </g>
 </svg>

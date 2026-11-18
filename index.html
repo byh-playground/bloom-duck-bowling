@@ -10,17 +10,13 @@
         <link rel="stylesheet" href="styles/front-menu.css" />
     </head>
     <body>
-        <main data-build="59">
+        <main data-build="60">
             <section id="home-screen" class="front-screen home-screen" aria-labelledby="home-title">
-                <div class="front-brand" aria-hidden="true">
-                    <img src="assets/duck-mark.svg" width="34" height="34" alt="" />
-                    BLOOM ARCADE
+                <div class="home-title">
+                    <img src="assets/duck-mark.svg" width="36" height="36" alt="" />
+                    <h1 id="home-title" tabindex="-1">덕 볼링</h1>
                 </div>
                 <div class="home-art"><img src="assets/duck-hero.svg" alt="" /></div>
-                <div class="home-title">
-                    <h1 id="home-title" tabindex="-1">덕 볼링</h1>
-                    <span lang="en" aria-hidden="true">DUCK BOWLING</span>
-                </div>
                 <div class="front-actions">
                     <button type="button" id="play" class="front-primary">
                         <span>플레이</span><span aria-hidden="true">→</span>
@@ -37,10 +33,12 @@
                 hidden
             >
                 <header class="front-header">
-                    <button type="button" id="maps-back" class="front-back">← 돌아가기</button>
-                    <img src="assets/duck-mark.svg" width="36" height="36" alt="" />
+                    <button type="button" id="maps-back" class="front-back">
+                        <span aria-hidden="true">←</span><span>돌아가기</span>
+                    </button>
+                    <h1 id="maps-title" tabindex="-1">맵 선택</h1>
+                    <img src="assets/duck-mark.svg" width="34" height="34" alt="" />
                 </header>
-                <h1 id="maps-title" tabindex="-1">맵 선택</h1>
                 <p id="map-notice" class="map-notice" role="status" hidden></p>
                 <div id="map-cards" class="map-cards"></div>
             </section>
