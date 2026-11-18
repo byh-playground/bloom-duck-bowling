@@ -1,5 +1,6 @@
+import { routeDefinition } from '../domain/arena.mjs';
 import { STEP_SECONDS, MAX_FRAME_SECONDS, MAX_FRAME_STEPS } from '../domain/timing.mjs';
-import { ROUTES } from '../domain/arena.mjs';
+import { button, message, renderMapCards, STORM_UNLOCK_NOTICE } from './front-menu.mjs';
 import { CampaignGame, AUGMENTS, STAGES } from '../domain/campaign.mjs';
 import {
     defaultProfile,
@@ -54,7 +55,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
             shotSeed: seed ?? crypto.getRandomValues(new Uint32Array(1))[0],
         });
     let profile = loadProfile(storage),
-        game = newGame('grove', profile.unlocks),
+        game = null,
         aim = null,
         last = 0,
         acc = 0,
@@ -63,27 +64,28 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         menuPage = null,
         saveFailed = false,
         frameNumber = 0,
+        framePending = false,
         displayedShot;
     const inputMetrics = [];
     const input = new BowlingInput(throwPad, {
         coordinateScale: 2,
         keyboardTarget: canvas,
-        getBalls: () => game.balls,
-        getBoss: () => game.boss,
+        getBalls: () => game?.balls ?? [],
+        getBoss: () => game?.boss,
         enabled: () =>
-            !menuPage && game.phase === 'playing' && !game.boss.delivery && duckAimOpen(game.boss),
+            !menuPage && game?.phase === 'playing' && !game.boss.delivery && duckAimOpen(game.boss),
         project,
         onAim: (a) => {
             if (a) for (const m of inputMetrics) if (m.firstMovementMs === null) m.cancelled = true;
             aim = a;
-            game.setAim(a);
+            game?.setAim(a);
         },
         onLaunch: (id, vx, vy, spin = 0) => game.launch(id, vx, vy, spin),
     });
     const movement = new MovementInput({
         stick: $('move-stick'),
-        enabled: () => !menuPage && game.phase === 'playing',
-        onMove: (x, y) => game.setMove(x, y),
+        enabled: () => !menuPage && game?.phase === 'playing',
+        onMove: (x, y) => game?.setMove(x, y),
         onDash: (event = {}) => {
             const at = performance.now(),
                 from = { x: game.boss.x, y: game.boss.y };
@@ -108,7 +110,8 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         },
     });
     function persistRun() {
-        if (recorded) return;
+        if (recorded || !game) return false;
+        const stormWasUnlocked = profile.unlocks.includes('storm');
         profile = recordRun(profile, {
             stage: game.stageIndex + 1,
             won: game.phase === 'won',
@@ -116,41 +119,64 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         });
         recorded = true;
         saveFailed = saveProfile(storage, profile) === false;
+        return !stormWasUnlocked && profile.unlocks.includes('storm');
     }
     function clearInput() {
         movement.reset();
         input.cancel();
         acc = 0;
     }
-    function reset(newRoute = game.route) {
-        if (game.elapsed > 1) persistRun();
+    function setScreen(screen) {
+        for (const name of ['home', 'maps', 'game']) {
+            $(name + '-screen').hidden = name !== screen;
+        }
+    }
+    function showHome() {
+        setScreen('home');
+        $('play').focus({ preventScroll: true });
+    }
+    function showMaps(newStorm = false) {
+        renderMapCards($('map-cards'), profile.unlocks, startRun);
+        const notice = $('map-notice');
+        notice.hidden = !newStorm;
+        notice.textContent = newStorm ? STORM_UNLOCK_NOTICE : '';
+        setScreen('maps');
+        $('maps-title').focus({ preventScroll: true });
+    }
+    function startRun(route) {
         clearInput();
         inputMetrics.length = 0;
-        game = newGame(newRoute, profile.unlocks);
+        game = newGame(route, profile.unlocks);
         displayedShot = undefined;
         recorded = false;
         overlayKey = '';
+        last = 0;
+        setScreen('game');
+        update();
+        canvas.focus({ preventScroll: true });
+        queueFrame();
+    }
+    function leaveRun() {
+        const newStorm = game.elapsed > 1 && persistRun();
+        clearInput();
+        game = null;
         showMenu(null);
+        showMaps(newStorm);
     }
-    function button(text, fn, cls = '') {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.textContent = text;
-        b.className = cls;
-        b.addEventListener('click', fn);
-        return b;
-    }
-    function message(tag, text) {
-        const e = document.createElement(tag);
-        e.textContent = text;
-        return e;
-    }
+    $('play').addEventListener('click', () => showMaps());
+    $('maps-back').addEventListener('click', showHome);
+    $('home-settings').addEventListener('click', () => openSettings(null));
+    $('maps-screen').addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        showHome();
+    });
     function overlayTitle(overlay, label) {
         const heading = message('h2', label);
         heading.id = 'overlay-title';
         overlay.append(heading);
     }
-    function showMenu(page) {
+    function showMenu(page, focusLabel = null) {
         const wasOpen = menuPage !== null;
         menuPage = page;
         if (page) {
@@ -160,7 +186,11 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
             const title = message('h2', page.title);
             title.id = 'menu-title';
             menuPanel.append(title);
-            const preferred = page.render(menuPanel);
+            const defaultFocus = page.render(menuPanel);
+            const preferred =
+                Array.from(menuPanel.querySelectorAll('button')).find(
+                    (el) => el.textContent === focusLabel,
+                ) ?? defaultFocus;
             if (!wasOpen) {
                 preferred.setAttribute('autofocus', '');
                 menuDialog.showModal();
@@ -172,75 +202,75 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         update();
     }
     function backFromMenu() {
-        if (menuPage) showMenu(menuPage.parent);
+        if (menuPage) showMenu(menuPage.parent, menuPage.focusOnBack);
     }
     function openMenu() {
-        if (menuPage) return;
+        if (menuPage || !game || ['won', 'lost'].includes(game.phase)) return;
         const page = {
-            title: game.phase === 'playing' ? '일시정지' : '메뉴',
+            title: '일시정지',
             parent: null,
             render(o) {
-                const resume = button(
-                    game.phase === 'playing' ? '계속하기' : '돌아가기',
-                    backFromMenu,
-                    'primary',
-                );
-                o.append(resume);
-                if (availableMaps().length > 1) o.append(button('맵 선택', () => openMaps(page)));
+                const resume = button('계속하기', backFromMenu, 'primary');
                 o.append(
-                    button('다시 시작', () => confirmRestart(game.route, page)),
-                    button('기록과 해금', () => openRecords(page)),
+                    resume,
+                    button('설정', () => openSettings(page)),
+                    button('이번 판 끝내기', () => confirmEndRun(page)),
                 );
                 return resume;
             },
         };
         showMenu(page);
     }
-    function availableMaps() {
-        return ROUTES.filter(({ unlock }) => !unlock || profile.unlocks.includes(unlock));
-    }
-    function openMaps(parent) {
+    function openSettings(parent) {
         const page = {
-            title: '맵 선택',
+            title: '설정',
             parent,
+            focusOnBack: '설정',
             render(o) {
-                for (const { id: route, label } of availableMaps()) {
-                    const option = button(label, () => {
-                        if (route === game.route) return;
-                        if (game.phase === 'won' || game.phase === 'lost' || game.elapsed === 0) {
-                            reset(route);
-                        } else {
-                            confirmRestart(route, page);
-                        }
-                    });
-                    if (route === game.route) {
-                        option.disabled = true;
-                        option.setAttribute('aria-current', 'true');
-                    }
-                    o.append(option);
-                }
-                const back = button('돌아가기', backFromMenu);
-                o.append(back);
-                return back;
+                const controls = button('조작법', () => openControls(page));
+                o.append(
+                    controls,
+                    button('기록과 해금', () => openRecords(page)),
+                    button('돌아가기', backFromMenu, 'subtle'),
+                );
+                return controls;
             },
         };
         showMenu(page);
     }
-    function confirmRestart(newRoute, parent) {
-        const changingMap = newRoute !== game.route;
+    function openControls(parent) {
         showMenu({
-            title: changingMap ? '맵을 바꿀까요?' : '다시 시작할까요?',
+            title: '조작법',
             parent,
+            focusOnBack: '조작법',
+            render(o) {
+                o.append(
+                    message(
+                        'p',
+                        '터치: 왼쪽 방향 패드를 길게 누르면 연속 대시. 오른쪽에서 밀고 놓으면 투구, 끝을 휘면 훅.',
+                    ),
+                    message(
+                        'p',
+                        '키보드: WASD로 대시. 경기장이나 투구 영역에 초점을 두고 방향키로 조준, Space 또는 Enter로 투구.',
+                    ),
+                );
+                const back = button('돌아가기', backFromMenu, 'primary');
+                o.append(back);
+                return back;
+            },
+        });
+    }
+    function confirmEndRun(parent) {
+        showMenu({
+            title: '이번 판을 끝낼까요?',
+            parent,
+            focusOnBack: '이번 판 끝내기',
             render(o) {
                 const cancel = button('취소', backFromMenu, 'primary');
                 o.append(
-                    message('p', '이번 판은 여기서 끝나요.'),
+                    message('p', '지금 도전은 이어 할 수 없어요. 끝내면 맵 선택으로 돌아가요.'),
                     cancel,
-                    button(
-                        changingMap ? '맵 바꾸기' : '다시 시작',
-                        () => reset(newRoute),
-                        'danger',
-                    ),
+                    button('끝내기', leaveRun, 'danger'),
                 );
                 return cancel;
             },
@@ -250,6 +280,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         const page = {
             title: '기록과 해금',
             parent,
+            focusOnBack: '기록과 해금',
             render(o) {
                 return renderRecords(o, page);
             },
@@ -267,7 +298,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
                 `${spinner ? '회전 공: 다음 판부터 등장' : '3구역 도달: 회전 공 해금'}\n${storm ? '폭풍 길: 열림' : '5구역 도달: 폭풍 길 해금'}`,
             ),
         );
-        if (game.augments.length) {
+        if (game?.augments.length) {
             const names = game.augments.map((id) => AUGMENTS.find((a) => a.id === id)?.name || id);
             o.append(message('small', '이번 판 증강: ' + names.join(' · ')));
         }
@@ -281,6 +312,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
                     showMenu({
                         title: '기록을 초기화할까요?',
                         parent: page,
+                        focusOnBack: '기록 초기화',
                         render(confirm) {
                             const cancel = button('취소', backFromMenu, 'primary');
                             confirm.append(
@@ -292,8 +324,12 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
                                         const ok = resetProfile(storage);
                                         if (ok) {
                                             profile = defaultProfile();
+                                            // A previously unlocked Storm run can finish, but
+                                            // it cannot repopulate progress that was just erased.
                                             recorded =
-                                                game.phase === 'won' || game.phase === 'lost';
+                                                game?.phase === 'won' ||
+                                                game?.phase === 'lost' ||
+                                                game?.route === 'storm';
                                         }
                                         saveFailed = !ok;
                                         backFromMenu();
@@ -327,7 +363,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         if (dismiss) backFromMenu();
     });
     document.addEventListener('visibilitychange', () => {
-        if (document.hidden && !menuPage && game.phase === 'playing') openMenu();
+        if (document.hidden && !menuPage && game?.phase === 'playing') openMenu();
     });
     function renderAugments(o) {
         o.append(
@@ -357,7 +393,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         o.append(message('p', '선택하면 체력 1칸 회복'));
     }
     function renderResult(o) {
-        persistRun();
+        const newStorm = persistRun();
         overlayTitle(
             o,
             game.phase === 'won' ? '완주!' : game.endless ? '무한 라운드 종료' : '도전 종료',
@@ -373,6 +409,11 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
                 `${progress} · ${mins}분 ${secs}초\n핀 ${game.stats.kills}개 · 최고 ${game.scoring.best}콤보 · 스트라이크 ${game.scoring.strikes}회`,
             ),
         );
+        if (newStorm) {
+            const unlock = message('p', STORM_UNLOCK_NOTICE, 'unlock-notice');
+            unlock.setAttribute('role', 'status');
+            o.append(unlock);
+        }
         if (saveFailed) o.append(message('p', '이 브라우저에 기록을 저장하지 못했어요.'));
         if (game.phase === 'won' && !game.expedition)
             o.append(
@@ -390,14 +431,20 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
                     'primary',
                 ),
             );
-        o.append(
-            button(
-                '다시 굴리기',
-                () => reset(),
-                game.phase === 'won' && !game.expedition ? '' : 'primary',
-            ),
-            button('기록과 해금', () => openRecords()),
-        );
+        const { unlock } = routeDefinition(game.route);
+        const canRetry = !unlock || profile.unlocks.includes(unlock);
+        if (canRetry) {
+            o.append(
+                button(
+                    '다시 굴리기',
+                    () => startRun(game.route),
+                    game.phase === 'won' && !game.expedition ? '' : 'primary',
+                ),
+            );
+        } else {
+            o.append(message('p', '숲길 5구역에 도달하면 폭풍 길이 다시 열려요.'));
+        }
+        o.append(button('맵 선택', leaveRun, canRetry ? '' : 'primary'));
     }
     function showOverlay() {
         const key =
@@ -413,6 +460,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         o.hidden = key === 'none';
         if (game.phase === 'choice') renderAugments(o);
         else if (!o.hidden) renderResult(o);
+        if (!o.hidden && !menuPage) o.querySelector('button')?.focus({ preventScroll: true });
     }
     function setText(el, value) {
         const next = String(value);
@@ -500,15 +548,23 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
     }
     function update() {
         movement.refresh();
+        const summary = $('summary');
+        if (!game) {
+            delete summary.dataset.state;
+            delete summary.dataset.inputMetrics;
+            summary.dataset.profile = JSON.stringify(profile);
+            return;
+        }
         if ((game.phase !== 'playing' || !duckAimOpen(game.boss)) && (aim || input.id !== null))
             input.cancel();
         const s = game.snapshot();
         updateRound(s);
         updateControls(s);
-        $('summary').dataset.state = JSON.stringify(s);
-        $('summary').dataset.inputMetrics = JSON.stringify(inputMetrics);
-        $('summary').dataset.profile = JSON.stringify(profile);
+        menuButton.hidden = s.phase === 'won' || s.phase === 'lost';
         showOverlay();
+        summary.dataset.state = JSON.stringify(s);
+        summary.dataset.inputMetrics = JSON.stringify(inputMetrics);
+        summary.dataset.profile = JSON.stringify(profile);
     }
     function repeatHeldDash() {
         const b = game.boss;
@@ -523,12 +579,19 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         )
             movement.repeatDash();
     }
+    function queueFrame() {
+        if (framePending) return;
+        framePending = true;
+        requestAnimationFrame(frame);
+    }
     function frame(now) {
+        framePending = false;
+        if (!game) return;
         frameNumber++;
         movement.refresh();
         const dt = last ? Math.min(MAX_FRAME_SECONDS, (now - last) / 1000) : 0;
         last = now;
-        if (!menuPage && game.phase === 'playing') {
+        if (!menuPage && game?.phase === 'playing') {
             acc += dt * stepRate;
             let count = 0;
             while (
@@ -566,7 +629,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         renderThrowPad(throwCtx, aim, {
             width: pw,
             height: ph,
-            available: !menuPage && game.phase === 'playing',
+            available: !menuPage && game?.phase === 'playing',
             airborne: !duckAimOpen(game.boss),
             doubleArmed: game.doubleArmed,
             delivering: game.boss.delivery?.phase,
@@ -574,9 +637,8 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
             keyboard: !!aim && input.id === null,
         });
         update();
-        requestAnimationFrame(frame);
+        queueFrame();
     }
     update();
-    requestAnimationFrame(frame);
-    return { snapshot: () => game.snapshot() };
+    return { snapshot: () => game?.snapshot() ?? null };
 }
