@@ -56,7 +56,7 @@ try {
     }
     boot.complete();
 
-    home.append(document.getElementById('product-version'));
+    home.querySelector('.home-menu').append(document.getElementById('product-version'));
     bootScreen.hidden = true;
     home.hidden = false;
 

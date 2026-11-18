@@ -9,6 +9,12 @@ export const CAMERA = Object.freeze({
     width: 640,
     height: 720,
 });
+export const CAMERA_VIEW = Object.freeze({
+    left: 0,
+    top: 0,
+    width: CAMERA.width,
+    height: CAMERA.height,
+});
 const cy = Math.cos(CAMERA.yaw),
     sy = Math.sin(CAMERA.yaw),
     sp = Math.sin(CAMERA.pitch),

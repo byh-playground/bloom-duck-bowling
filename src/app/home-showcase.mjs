@@ -6,7 +6,8 @@ import { expeditionCameraShift, render } from '../presentation/render.mjs';
 import { runShowcaseCommand } from './showcase-program.mjs';
 
 const SHOT_MS = 3000;
-const RECOVERY_ZOOM = 1.22;
+const WIDE_SHOT = { width: 500, height: 390, duckY: 0.77 };
+const RECOVERY_SHOT = { width: 410, height: 320, duckY: 0.69 };
 const TIMELINE = [
     { atMs: 700, command: 'straight-roll' },
     { atMs: SHOT_MS, command: 'dash-forward' },
@@ -18,28 +19,22 @@ const TIMELINE = [
     { atMs: SHOT_MS * 2 + 1600, command: 'storm-hook' },
 ];
 
-const clamp = (value, max) => Math.max(0, Math.min(value, max));
-
 function renderShot(ctx, game, timeMs) {
     const recovery = timeMs >= SHOT_MS && timeMs < SHOT_MS * 2;
-    const zoom = recovery ? RECOVERY_ZOOM : 1;
+    const shot = recovery ? RECOVERY_SHOT : WIDE_SHOT;
+    const zoom = Math.min(ctx.canvas.width / shot.width, ctx.canvas.height / shot.height);
     const width = ctx.canvas.width / zoom;
     const height = ctx.canvas.height / zoom;
     const shift = expeditionCameraShift(game.expedition);
     const duck = project(game.boss.x, game.boss.y);
-    const left = clamp(
-        recovery ? duck.x + shift.x - width * 0.52 : (CAMERA.width - width) * 0.5,
-        CAMERA.width - width,
-    );
-    const top = clamp(
-        duck.y + shift.y - (recovery ? height * 0.72 : height - 24),
-        CAMERA.height - height,
-    );
+    const centerX = recovery ? duck.x + shift.x : CAMERA.screenAnchor.x;
+    const left = centerX - width / 2;
+    const top = duck.y + shift.y - height * shot.duckY;
     ctx.save();
     try {
         ctx.scale(zoom, zoom);
         ctx.translate(-left, -top);
-        render(ctx, game);
+        render(ctx, game, null, { left, top, width, height });
     } finally {
         ctx.restore();
     }

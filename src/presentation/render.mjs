@@ -3,7 +3,7 @@ import { BALL_TYPES, predictRoll, prepareRoll, rollBounds } from '../domain/dyna
 import { shieldGuardUp } from '../domain/enemies.mjs';
 import { bowlerPose, bowlerRecoilPoint, FOLLOW_TIME, releasePoint } from '../domain/bowler.mjs';
 // Original read-only 2.5D canvas renderer. No random draws or simulation mutation.
-import { CAMERA, project, cameraDepth, worldVectorToScreen } from './camera.mjs';
+import { CAMERA, CAMERA_VIEW, project, cameraDepth, worldVectorToScreen } from './camera.mjs';
 import {
     specialPinMark,
     pinThreatGround,
@@ -972,7 +972,7 @@ function scoreCard(c, { x, y, w, h, fill, stroke }) {
     c.lineWidth = 2;
     c.stroke();
 }
-function scoreFeedback(c, events, shift = { x: 0, y: 0 }) {
+function scoreFeedback(c, events, shift = { x: 0, y: 0 }, view) {
     if (!events?.length) return;
     const current = events.filter((e) => e.age >= 0 && e.age < e.life);
     const combo = current.findLast((e) => e.kind === 'combo' && e.count >= 2),
@@ -981,12 +981,16 @@ function scoreFeedback(c, events, shift = { x: 0, y: 0 }) {
         const fade = clamp((combo.life - combo.age) / 0.22, 0, 1),
             appear = clamp((combo.age + 0.02) / 0.08, 0, 1);
         const hit = project(combo.x, combo.y, 40);
-        const x = clamp(hit.x + shift.x, 76, CAMERA.width - 76),
-            y = clamp(
-                hit.y + shift.y - 50 - combo.age * 17,
-                strike ? 160 : 119,
-                CAMERA.height - 140,
-            );
+        const x = clamp(hit.x + shift.x, view.left + 76, view.left + view.width - 76);
+        const topInset = strike
+            ? Math.min(160, view.height * 0.23)
+            : Math.min(119, view.height * 0.17);
+        const bottomInset = Math.min(140, view.height * 0.2);
+        const y = clamp(
+            hit.y + shift.y - 50 - combo.age * 17,
+            view.top + topInset,
+            view.top + view.height - bottomInset,
+        );
         c.save();
         c.globalAlpha = fade * appear;
         scoreCard(c, { x, y, w: 140, h: 41, fill: '#243f3b', stroke: '#b9e6b0' });
@@ -997,8 +1001,8 @@ function scoreFeedback(c, events, shift = { x: 0, y: 0 }) {
     if (strike) {
         const fade = clamp((strike.life - strike.age) / 0.3, 0, 1),
             progress = clamp(strike.age / 0.17, 0, 1);
-        const x = CAMERA.width / 2,
-            y = 107 - 11 * progress;
+        const x = view.left + view.width / 2,
+            y = view.top + Math.min(107, view.height * 0.22) - 11 * progress;
         c.save();
         c.globalAlpha = fade;
         scoreCard(c, { x, y, w: 218, h: 79, fill: '#293c3c', stroke: '#f4d486' });
@@ -1053,9 +1057,9 @@ export function expeditionCameraShift(expedition) {
         : null;
 }
 
-export function render(c, g, aim = null) {
+export function render(c, g, aim = null, view = CAMERA_VIEW) {
     c.save();
-    c.clearRect(0, 0, CAMERA.width, CAMERA.height);
+    c.clearRect(view.left, view.top, view.width, view.height);
     const shake = Math.min(2.5, Math.max(0, g.shake || 0));
     c.translate(Math.sin((g.time || 0) * 47) * shake, Math.cos((g.time || 0) * 39) * shake * 0.6);
     const arena = g.arena ?? arenaForRoute(g.route),
@@ -1064,10 +1068,16 @@ export function render(c, g, aim = null) {
     if (shift) {
         const storm = routeDefinition(g.route).landscape === 'storm';
         c.fillStyle = storm ? STORM_SHADE : FOREST_SHADE;
-        c.fillRect(-4, -4, CAMERA.width + 8, CAMERA.height + 8);
+        c.fillRect(view.left - 4, view.top - 4, view.width + 8, view.height + 8);
         c.save();
         c.translate(shift.x, shift.y);
-        drawExpeditionLandscape(c, exp, shift, { polygon, line, ellipse }, { storm, time: g.time });
+        drawExpeditionLandscape(
+            c,
+            exp,
+            shift,
+            { polygon, line, ellipse },
+            { storm, time: g.time, view },
+        );
     } else field(c, g.route, arena, g.time);
     // Ready balls count as supply; echoes do not. Armed loose balls stay collectible while rolling or before auto-return.
     const bounds = exp?.room?.arena;
@@ -1464,6 +1474,6 @@ export function render(c, g, aim = null) {
         }
     }
     if (shift) c.restore();
-    scoreFeedback(c, (g.scoreFeedback || []).filter(seen), shift ?? undefined);
+    scoreFeedback(c, (g.scoreFeedback || []).filter(seen), shift ?? undefined, view);
     c.restore();
 }
