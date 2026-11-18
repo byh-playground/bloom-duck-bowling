@@ -5,83 +5,131 @@
         <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
         <meta name="description" content="오리로 대시하고, 공을 굴려 몰려오는 핀을 쓰러뜨리세요." />
         <title>덕 볼링 (Duck Bowling)</title>
+        <link rel="icon" type="image/svg+xml" href="assets/duck-mark.svg" />
         <link rel="stylesheet" href="styles/game.css" />
+        <link rel="stylesheet" href="styles/front-menu.css" />
     </head>
     <body>
-        <main data-build="57">
-            <header class="duck-header">
-                <h1>덕 볼링</h1>
-                <button id="menu" type="button" aria-haspopup="dialog" aria-controls="menu-dialog">
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path
-                            d="M4 6h16M4 12h16M4 18h16"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                        />
-                    </svg>
-                    메뉴
-                </button>
-            </header>
-            <section class="round-hud" aria-label="라운드 진행">
-                <div class="round-info">
-                    <strong id="round"></strong>
-                    <span id="objective"></span>
+        <main data-build="58">
+            <section id="home-screen" class="front-screen home-screen" aria-labelledby="home-title">
+                <div class="front-brand" aria-hidden="true">
+                    <img src="assets/duck-mark.svg" width="34" height="34" alt="" />
+                    BLOOM ARCADE
                 </div>
-                <div id="health" class="health" role="meter" aria-label="체력"></div>
+                <div class="home-art"><img src="assets/duck-hero.svg" alt="" /></div>
+                <div class="home-title">
+                    <h1 id="home-title" tabindex="-1">덕 볼링</h1>
+                    <span lang="en" aria-hidden="true">DUCK BOWLING</span>
+                </div>
+                <div class="front-actions">
+                    <button type="button" id="play" class="front-primary">
+                        <span>플레이</span><span aria-hidden="true">→</span>
+                    </button>
+                    <button type="button" id="home-settings">
+                        <span aria-hidden="true">⚙</span> 설정
+                    </button>
+                </div>
             </section>
-            <section class="arena">
-                <canvas
-                    id="game"
-                    tabindex="0"
-                    width="640"
-                    height="720"
-                    aria-label="덕 볼링 경기장"
-                ></canvas>
-                <div
-                    id="overlay"
-                    class="popup-actions"
-                    role="dialog"
-                    aria-labelledby="overlay-title"
-                    hidden
-                ></div>
+            <section
+                id="maps-screen"
+                class="front-screen maps-screen"
+                aria-labelledby="maps-title"
+                hidden
+            >
+                <header class="front-header">
+                    <button type="button" id="maps-back" class="front-back">← 돌아가기</button>
+                    <img src="assets/duck-mark.svg" width="36" height="36" alt="" />
+                </header>
+                <h1 id="maps-title" tabindex="-1">맵 선택</h1>
+                <p id="map-notice" class="map-notice" role="status" hidden></p>
+                <div id="map-cards" class="map-cards"></div>
             </section>
-            <section class="move-controls" aria-label="대시와 굴리기">
-                <div
-                    id="move-stick"
-                    role="group"
-                    aria-label="왼쪽 대시. 원하는 방향을 길게 누르면 대시가 충전될 때마다 이동합니다. 키보드는 WASD."
-                    tabindex="0"
-                >
-                    <span class="stick-cross" aria-hidden="true">✥</span>
-                    <span class="stick-center" aria-hidden="true"></span>
-                    <i class="stick-knob" aria-hidden="true"></i>
-                    <div id="dash-charges" class="dash-charges" role="img">
-                        <i id="dash-charge-0" class="dash-charge full" aria-hidden="true"></i>
-                        <i id="dash-charge-1" class="dash-charge full" aria-hidden="true"></i>
-                        <i id="dash-charge-2" class="dash-charge full" aria-hidden="true"></i>
+            <section id="game-screen" class="game-screen" aria-label="덕 볼링 경기" hidden>
+                <header class="duck-header">
+                    <h1>덕 볼링</h1>
+                    <button
+                        id="menu"
+                        type="button"
+                        aria-haspopup="dialog"
+                        aria-controls="menu-dialog"
+                    >
+                        <svg
+                            width="17"
+                            height="17"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            aria-hidden="true"
+                        >
+                            <path
+                                d="M4 6h16M4 12h16M4 18h16"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                            />
+                        </svg>
+                        일시정지
+                    </button>
+                </header>
+                <section class="round-hud" aria-label="라운드 진행">
+                    <div class="round-info">
+                        <strong id="round"></strong>
+                        <span id="objective"></span>
                     </div>
-                    <small aria-hidden="true">대시</small>
-                </div>
-                <div class="shot-dock">
-                    <div class="queued-shot">
-                        <div class="current-ball" role="status" aria-atomic="true">
-                            <i id="shot-orb" class="orb" aria-hidden="true" hidden></i>
-                            <strong id="shot-kind"></strong>
-                            <span id="shot-trait"></span>
+                    <div id="health" class="health" role="meter" aria-label="체력"></div>
+                </section>
+                <section class="arena">
+                    <canvas
+                        id="game"
+                        tabindex="0"
+                        width="640"
+                        height="720"
+                        aria-label="덕 볼링 경기장"
+                    ></canvas>
+                    <div
+                        id="overlay"
+                        class="popup-actions"
+                        role="dialog"
+                        aria-labelledby="overlay-title"
+                        hidden
+                    ></div>
+                </section>
+                <section class="move-controls" aria-label="대시와 굴리기">
+                    <div
+                        id="move-stick"
+                        role="group"
+                        aria-label="왼쪽 대시. 원하는 방향을 길게 누르면 대시가 충전될 때마다 이동합니다. 키보드는 WASD."
+                        tabindex="0"
+                    >
+                        <span class="stick-cross" aria-hidden="true">✥</span>
+                        <span class="stick-center" aria-hidden="true"></span>
+                        <i class="stick-knob" aria-hidden="true"></i>
+                        <div id="dash-charges" class="dash-charges" role="img">
+                            <i id="dash-charge-0" class="dash-charge full" aria-hidden="true"></i>
+                            <i id="dash-charge-1" class="dash-charge full" aria-hidden="true"></i>
+                            <i id="dash-charge-2" class="dash-charge full" aria-hidden="true"></i>
                         </div>
-                        <span id="ammo" class="ammo">공 <b id="ammo-count"></b></span>
+                        <small aria-hidden="true">대시</small>
                     </div>
-                    <div class="throw-control">
-                        <canvas
-                            id="throw-pad"
-                            width="440"
-                            height="256"
-                            tabindex="0"
-                            aria-label="오른쪽 굴리기 영역"
-                        ></canvas>
+                    <div class="shot-dock">
+                        <div class="queued-shot">
+                            <div class="current-ball" role="status" aria-atomic="true">
+                                <i id="shot-orb" class="orb" aria-hidden="true" hidden></i>
+                                <strong id="shot-kind"></strong>
+                                <span id="shot-trait"></span>
+                            </div>
+                            <span id="ammo" class="ammo">공 <b id="ammo-count"></b></span>
+                        </div>
+                        <div class="throw-control">
+                            <canvas
+                                id="throw-pad"
+                                width="440"
+                                height="256"
+                                tabindex="0"
+                                aria-label="오른쪽 굴리기 영역"
+                            ></canvas>
+                        </div>
                     </div>
-                </div>
+                </section>
             </section>
             <dialog id="menu-dialog" aria-labelledby="menu-title">
                 <div id="menu-panel" class="popup-actions"></div>

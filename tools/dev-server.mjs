@@ -9,6 +9,7 @@ const TYPES = new Map([
     ['.html', 'text/html; charset=utf-8'],
     ['.mjs', 'text/javascript; charset=utf-8'],
     ['.css', 'text/css; charset=utf-8'],
+    ['.svg', 'image/svg+xml'],
 ]);
 const PORT = Number(process.env.PORT ?? 4173);
 
@@ -33,7 +34,7 @@ createServer(async (request, response) => {
         !FILE.startsWith(ROOT) ||
         !TYPE ||
         (pathname !== '/index.html' &&
-            !['src', 'styles'].some((dir) => FILE.startsWith(ROOT + dir + sep)))
+            !['src', 'styles', 'assets'].some((dir) => FILE.startsWith(ROOT + dir + sep)))
     ) {
         response.writeHead(404).end();
         return;
