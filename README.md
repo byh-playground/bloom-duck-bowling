@@ -31,4 +31,6 @@ npm test
 
 ## 배포
 
-정적 게임 원본만 서비스하면 됩니다. 현재 저장소에는 공개 Pages 자동 배포가 없습니다. 기존 플레이 사이트는 이관과 별도이며, Nightly 태그는 공개 배포나 Stable 승격을 뜻하지 않습니다.
+[덕 볼링 플레이](https://byh-playground.github.io/bloom-duck-bowling/)
+
+GitHub Pages가 `main` 브랜치 루트의 HTML·ES 모듈·CSS 원본을 별도 빌드 없이 배포합니다. Nightly 태그는 소스 시점을 표시하며 Pages 배포와 별개입니다. Pages 배포는 Stable 승격을 뜻하지 않습니다.
