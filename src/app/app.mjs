@@ -679,5 +679,5 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed } = {}) {
         update();
     }
     update();
-    return { snapshot: () => game?.snapshot() ?? null };
+    return { audioReady: audio.ready, snapshot: () => game?.snapshot() ?? null };
 }

@@ -4,6 +4,7 @@
 
 - 엔트리는 루트 `index.html`, 원본은 `src/`와 `styles/`입니다. 게임을 실행하거나 배포하기 위한 생성·번들 단계는 두지 않습니다.
 - 공통 실행·표현 기능을 더하기 전에 [GameKit 모듈 색인](https://github.com/byh-playground/bloom-gamekit#readme)을 확인합니다. 공용 모듈은 `index.html` import map의 불변 dist 커밋으로 가져옵니다.
+- 게임 버전은 `index.html`의 `#product-version`에서 관리합니다. 공통 PM-001·PM-002를 따라 버전을 판정하고, 로딩과 홈에서 같은 요소를 표시합니다.
 - 상태 및 파일의 책임은 [구조 문서](docs/architecture.md)를 따릅니다.
 - 작업 브랜치 검증 후 `main` 대상 PR을 사용합니다. 커밋과 작업 문서는 한국어로 씁니다.
 - 포맷과 정적 검사는 DEV-028~031을 따릅니다. 덕 볼링의 PR CI는 변경된 JavaScript(`.js`, `.mjs`, `.cjs`)의 문법만 확인하며 패키지 설치, 포맷·린트, 테스트는 실행하지 않습니다. 포맷·린트는 필요할 때 로컬에서 `npm run check` 또는 `BASE_SHA=<기준 커밋> npm run check:changed`로 확인합니다.

@@ -18,6 +18,56 @@
     color: var(--duck-ink);
 }
 
+.boot-screen {
+    display: grid;
+    place-items: center;
+}
+
+.boot-card {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    width: min(100%, 320px);
+    padding: clamp(20px, 7vw, 34px);
+    border: 1px solid var(--duck-rail);
+    border-radius: 16px;
+    background: var(--duck-panel);
+    text-align: center;
+}
+
+.boot-card img {
+    border-radius: 13px;
+}
+
+.boot-card h1 {
+    font-size: 30px;
+    line-height: 1;
+}
+
+.boot-card progress {
+    width: 100%;
+    height: 10px;
+    margin-top: 8px;
+    accent-color: var(--duck-primary);
+}
+
+.boot-card p {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.boot-card .front-back {
+    padding-inline: 14px;
+    text-decoration: none;
+}
+
+.product-version {
+    color: var(--duck-muted-ink);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
 .home-screen {
     justify-content: center;
     align-items: center;

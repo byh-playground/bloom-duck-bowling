@@ -100,13 +100,14 @@ export function createBowlingAudio() {
         startMusic();
     }
 
-    void preloadMusic().catch((error) => {
+    const ready = preloadMusic().catch((error) => {
         if (!preload.signal.aborted) {
             console.warn('Duck Bowling music could not load', error);
         }
     });
 
     return {
+        ready,
         async unlock() {
             const unlocked = await player.unlock();
             if (unlocked) startMusic();
