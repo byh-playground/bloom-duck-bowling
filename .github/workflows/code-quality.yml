@@ -18,6 +18,8 @@ jobs:
             - uses: actions/setup-node@v4
               with:
                   node-version: '22'
+            - name: Check content index
+              run: node tools/content-index.mjs --check
             - name: Check changed JavaScript syntax
               shell: bash
               env:

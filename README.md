@@ -33,7 +33,9 @@ npm run check
 npm test
 ```
 
-`npm run check`는 포맷·린트, `npm test`는 숲길·폭풍 길 완주 시나리오를 로컬에서 실행합니다. PR CI는 변경된 JavaScript(`.js`, `.mjs`, `.cjs`)의 문법만 확인하고, 패키지 설치·포맷·린트·테스트는 실행하지 않습니다. 책임 배치는 [구조 문서](docs/architecture.md), Build 57 출처와 검증 범위는 [이관 기록](docs/migration.md), 공통 규칙 링크는 [작업 안내](AGENTS.md)에 있습니다.
+`npm run check`는 콘텐츠 목록·포맷·린트, `npm test`는 숲길·폭풍 길 완주 시나리오를 로컬에서 실행합니다. PR CI는 변경된 JavaScript(`.js`, `.mjs`, `.cjs`)의 문법과 콘텐츠 목록 일치 여부를 확인하고, 패키지 설치·포맷·린트·테스트는 실행하지 않습니다. 책임 배치는 [구조 문서](docs/architecture.md), Build 57 출처와 검증 범위는 [이관 기록](docs/migration.md), 공통 규칙 링크는 [작업 안내](AGENTS.md)에 있습니다.
+
+맵이나 플레이어 캐릭터를 추가하는 방법은 [콘텐츠 정의](docs/architecture.md#콘텐츠-정의)에 있습니다.
 
 ## 배포
 

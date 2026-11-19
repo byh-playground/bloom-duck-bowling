@@ -1,7 +1,8 @@
 import { createLoop } from '@bloom-gamekit/simloop';
-import { routeDefinition } from '../domain/arena.mjs';
+import { ROUTES, isRouteUnlocked, routeDefinition } from '../domain/arena.mjs';
+import { BOWLERS, DEFAULT_BOWLER } from '../domain/bowlers.mjs';
 import { STEP_SECONDS, TICK_RATE_HZ, MAX_FRAME_STEPS } from '../domain/timing.mjs';
-import { button, message, renderMapCards, STORM_UNLOCK_NOTICE } from './front-menu.mjs';
+import { button, message, renderMapCards } from './front-menu.mjs';
 import { CampaignGame, AUGMENTS, STAGES } from '../domain/campaign.mjs';
 import {
     defaultProfile,
@@ -67,10 +68,23 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
     health.append(...lifePips);
     health.setAttribute('aria-valuemin', '0');
     health.setAttribute('aria-valuemax', String(DUCK_COMBAT.maxHp));
+    const bowlerSelect = $('bowler-select');
+    if (!showcaseDemo && BOWLERS.length > 1) {
+        bowlerSelect.replaceChildren(
+            ...BOWLERS.map(({ id, label }) => {
+                const option = message('option', label);
+                option.value = id;
+                return option;
+            }),
+        );
+        bowlerSelect.value = DEFAULT_BOWLER;
+        $('bowler-picker').hidden = false;
+    }
     const newGame = (route, unlocks) =>
         new CampaignGame(seed ?? 42, {
             route,
             unlocks,
+            bowler: bowlerSelect.value || DEFAULT_BOWLER,
             expedition: true,
             onEvent: audio
                 ? (kind, impulse) => {
@@ -140,8 +154,8 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         },
     });
     function persistRun() {
-        if (showcaseDemo || recorded || !game) return false;
-        const stormWasUnlocked = profile.unlocks.includes('storm');
+        if (showcaseDemo || recorded || !game) return [];
+        const previousUnlocks = profile.unlocks;
         profile = recordRun(profile, {
             stage: game.stageIndex + 1,
             won: game.phase === 'won',
@@ -149,7 +163,10 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         });
         recorded = true;
         saveFailed = saveProfile(storage, profile) === false;
-        return !stormWasUnlocked && profile.unlocks.includes('storm');
+        return ROUTES.filter(
+            (route) =>
+                !isRouteUnlocked(route, previousUnlocks) && isRouteUnlocked(route, profile.unlocks),
+        ).map((route) => route.unlockNotice);
     }
     function clearInput() {
         movement.reset();
@@ -166,11 +183,11 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         setScreen('home');
         $('play').focus({ preventScroll: true });
     }
-    function showMaps(newStorm = false) {
+    function showMaps(unlockNotices = []) {
         renderMapCards($('map-cards'), profile.unlocks, startRun);
         const notice = $('map-notice');
-        notice.hidden = !newStorm;
-        notice.textContent = newStorm ? STORM_UNLOCK_NOTICE : '';
+        notice.hidden = !unlockNotices.length;
+        notice.textContent = unlockNotices.join(' ');
         setScreen('maps');
         $('maps-title').focus({ preventScroll: true });
     }
@@ -189,12 +206,12 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         }
     }
     function leaveRun() {
-        const newStorm = game.elapsed > 1 && persistRun();
+        const unlockNotices = game.elapsed > 1 ? persistRun() : [];
         clearInput();
         game = null;
         loop.stop();
         showMenu(null);
-        showMaps(newStorm);
+        showMaps(unlockNotices);
     }
     $('play').addEventListener('click', () => showMaps());
     $('maps-back').addEventListener('click', showHome);
@@ -337,14 +354,16 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
     function renderRecords(o, page) {
         o.append($('game-intro').content.cloneNode(true));
         o.append(message('p', `최고 ${profile.bestStage}구역 · 완주 ${profile.wins}회`));
-        const spinner = profile.unlocks.includes('spinner'),
-            storm = profile.unlocks.includes('storm');
-        o.append(
-            message(
-                'small',
-                `${spinner ? '회전 공: 다음 판부터 등장' : '3구역 도달: 회전 공 해금'}\n${storm ? '폭풍 길: 열림' : '5구역 도달: 폭풍 길 해금'}`,
+        const spinner = profile.unlocks.includes('spinner');
+        const unlockSummary = [
+            spinner ? '회전 공: 다음 판부터 등장' : '3구역 도달: 회전 공 해금',
+            ...ROUTES.filter((route) => route.unlock).map((route) =>
+                isRouteUnlocked(route, profile.unlocks)
+                    ? `${route.label}: 열림`
+                    : `${route.unlockAt}구역 도달: ${route.label} 해금`,
             ),
-        );
+        ];
+        o.append(message('small', unlockSummary.join('\n')));
         if (game?.augments.length) {
             const names = game.augments.map((id) => AUGMENTS.find((a) => a.id === id)?.name || id);
             o.append(message('small', '이번 판 증강: ' + names.join(' · ')));
@@ -371,12 +390,12 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
                                         const ok = resetProfile(storage);
                                         if (ok) {
                                             profile = defaultProfile();
-                                            // A previously unlocked Storm run can finish, but
+                                            // A run on a previously unlocked map can finish, but
                                             // it cannot repopulate progress that was just erased.
                                             recorded =
                                                 game?.phase === 'won' ||
                                                 game?.phase === 'lost' ||
-                                                game?.route === 'storm';
+                                                Boolean(game && routeDefinition(game.route).unlock);
                                         }
                                         saveFailed = !ok;
                                         backFromMenu();
@@ -461,7 +480,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         o.append(message('p', '선택하면 체력 1칸 회복'));
     }
     function renderResult(o) {
-        const newStorm = persistRun();
+        const unlockNotices = persistRun();
         overlayTitle(
             o,
             game.phase === 'won' ? '완주!' : game.endless ? '무한 라운드 종료' : '도전 종료',
@@ -477,8 +496,8 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
                 `${progress} · ${mins}분 ${secs}초\n핀 ${game.stats.kills}개 · 최고 ${game.scoring.best}콤보 · 스트라이크 ${game.scoring.strikes}회`,
             ),
         );
-        if (newStorm) {
-            const unlock = message('p', STORM_UNLOCK_NOTICE, 'unlock-notice');
+        if (unlockNotices.length) {
+            const unlock = message('p', unlockNotices.join(' '), 'unlock-notice');
             unlock.setAttribute('role', 'status');
             o.append(unlock);
         }
@@ -499,8 +518,8 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
                     'primary',
                 ),
             );
-        const { unlock } = routeDefinition(game.route);
-        const canRetry = !unlock || profile.unlocks.includes(unlock);
+        const route = routeDefinition(game.route);
+        const canRetry = isRouteUnlocked(route, profile.unlocks);
         if (canRetry) {
             o.append(
                 button(
@@ -510,7 +529,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
                 ),
             );
         } else {
-            o.append(message('p', '숲길 5구역에 도달하면 폭풍 길이 다시 열려요.'));
+            o.append(message('p', route.lockedRetry));
         }
         o.append(button('맵 선택', leaveRun, canRetry ? '' : 'primary'));
     }

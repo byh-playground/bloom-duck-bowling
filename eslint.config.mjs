@@ -6,6 +6,7 @@ export default [
     {
         ignores: [
             '**/node_modules/**',
+            'src/content/index.mjs',
             '**/dist/**',
             '**/build/**',
             '**/vendor/**',

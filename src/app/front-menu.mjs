@@ -1,18 +1,11 @@
-import { ROUTES } from '../domain/arena.mjs';
+import { ROUTES, isRouteUnlocked } from '../domain/arena.mjs';
 
-const CARD_ART = {
-    grove: {
-        src: 'assets/grove-card.svg',
-        description: '숲속 공터와 갈림길',
-    },
-    storm: {
-        src: 'assets/storm-card.svg',
-        description: '비 내리는 좁은 협곡',
-        locked: '숲길 5구역 도달 시 해금',
-    },
+const CARD_COLORS = {
+    imageBackground: '--map-image-background',
+    badgeBackground: '--map-badge-background',
+    badgeInk: '--map-badge-ink',
+    line: '--map-badge-line',
 };
-
-export const STORM_UNLOCK_NOTICE = '폭풍 길이 열렸어요!';
 
 export function button(text, onClick, className = '') {
     const b = document.createElement('button');
@@ -30,12 +23,14 @@ export function message(tag, text, className = '') {
     return el;
 }
 
-function createMapCard({ id, label, unlock }, unlocked, onStart) {
-    const art = CARD_ART[id];
-    const card = button('', () => onStart(id), `map-card map-card--${id}`);
+function createMapCard({ id, label, card: art }, unlocked, onStart) {
+    const card = button('', () => onStart(id), 'map-card');
+    for (const [field, property] of Object.entries(CARD_COLORS)) {
+        if (art.colors[field]) card.style.setProperty(property, art.colors[field]);
+    }
     card.disabled = !unlocked;
     card.dataset.route = id;
-    if (unlock && !unlocked) card.classList.add('locked');
+    if (!unlocked) card.classList.add('locked');
 
     const image = document.createElement('img');
     image.src = art.src;
@@ -59,8 +54,6 @@ function createMapCard({ id, label, unlock }, unlocked, onStart) {
 
 export function renderMapCards(list, unlocks, onStart) {
     list.replaceChildren(
-        ...ROUTES.map((route) =>
-            createMapCard(route, !route.unlock || unlocks.includes(route.unlock), onStart),
-        ),
+        ...ROUTES.map((route) => createMapCard(route, isRouteUnlocked(route, unlocks), onStart)),
     );
 }

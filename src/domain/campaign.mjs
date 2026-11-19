@@ -1,5 +1,11 @@
 import { STEP_SECONDS, PHYSICS_STEP_SECONDS, MAX_FRAME_SECONDS } from './timing.mjs';
-import { arenaForRoute, rackEntrance, routeDefinition, unlockedRoute } from './arena.mjs';
+import {
+    DEFAULT_ROUTE,
+    arenaForRoute,
+    rackEntrance,
+    routeDefinition,
+    unlockedRoute,
+} from './arena.mjs';
 import { BowlingGame } from './sim.mjs';
 import { manualBounds } from './locomotion.mjs';
 import {
@@ -103,12 +109,13 @@ export class CampaignGame extends BowlingGame {
     constructor(
         seed = 42,
         {
-            route = 'grove',
+            route = DEFAULT_ROUTE,
             unlocks = [],
             pace = BATTLE_PACE,
             shotSeed = seed,
             expedition = false,
             onEvent,
+            bowler,
         } = {},
     ) {
         const ACTIVE_ROUTE = unlockedRoute(route, unlocks);
@@ -118,6 +125,7 @@ export class CampaignGame extends BowlingGame {
             arena: ACTIVE_ROUTE.arena,
             home: ACTIVE_ROUTE.home,
             onEvent,
+            bowler,
         });
         this.duckBounds = manualBounds(this.arena);
         this.controlMode = 'manual';

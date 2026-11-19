@@ -24,6 +24,7 @@ import {
 } from './duck-recoil.mjs';
 import { stepMobility, freezeMovement, stepManual, MANUAL } from './locomotion.mjs';
 import { bowlerPose, SWING_TIME, FOLLOW_TIME } from './bowler.mjs';
+import { bowlerDefinition } from './bowlers.mjs';
 // Independent arcade circle physics. No assets/state from the earlier modes are changed.
 export const WORLD = { width: ARENA.width, height: ARENA.height, duration: 60 };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -35,6 +36,7 @@ export class BowlingGame {
             duration = 60,
             arena = ARENA,
             onEvent,
+            bowler,
             home = { x: 300, y: 630, ballY: 790 },
         } = {},
     ) {
@@ -63,13 +65,15 @@ export class BowlingGame {
         this.wave = 0;
         this.nextWave = 0;
         this.shake = 0;
+        const character = bowlerDefinition(bowler);
         this.boss = {
             arena,
+            bowlerId: character.id,
             x: home.x,
             y: home.y,
             homeX: home.x,
             homeY: home.y,
-            r: 56,
+            r: character.radius,
             facing: -Math.PI / 2,
             aimPower: 0,
             aiming: false,

@@ -1,0 +1,36 @@
+export default {
+    id: 'storm',
+    label: '폭풍 길',
+    landscape: 'storm',
+    unlockAt: 5,
+    unlockNotice: '폭풍 길이 열렸어요!',
+    lockedRetry: '숲길 5구역에 도달하면 폭풍 길이 다시 열려요.',
+    card: {
+        src: 'assets/storm-card.svg',
+        description: '비 내리는 좁은 협곡',
+        locked: '숲길 5구역 도달 시 해금',
+        colors: {
+            imageBackground: '#243746',
+            badgeBackground: '#d3dee3',
+            badgeInk: '#304b5b',
+            line: '#a1b4bd',
+        },
+    },
+    arena: { left: 10, right: 590, top: -20, bottom: 1170, enclosedPins: true },
+    home: { y: 920, ballY: 1080 },
+    trail: [
+        { title: '폭풍 협곡 입구', decor: 'ravine', packets: 2, stage: 0 },
+        { title: '빗물 굽이', decor: 'rainbend', packets: 2, stage: 1 },
+        { title: '번개 골짜기', decor: 'thunderpass', packets: 3, stage: 2 },
+        { title: '폭풍의 문', decor: 'storm-gate', packets: 3, stage: 3 },
+        { title: '폭풍의 눈', decor: 'storm-eye', packets: 3, stage: 7 },
+    ],
+    widths: [525, 565, 540, 555],
+    depths: [905, 855, 945, 885],
+    pinKinds: { shield: 'bomb', bomb: 'shield' },
+    rackEntrances: [
+        { y: 440, nx: 0, ny: 1, lane: 'middle' },
+        { offsetX: 165, y: 270, nx: -0.6, ny: 0.8, lane: 'right' },
+        { offsetX: -165, y: 170, nx: 0.6, ny: 0.8, lane: 'left' },
+    ],
+};

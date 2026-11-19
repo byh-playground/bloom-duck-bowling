@@ -7,7 +7,8 @@
     },
     "scripts": {
         "dev": "node tools/dev-server.mjs",
-        "check": "prettier --check . && eslint .",
+        "content:index": "node tools/content-index.mjs",
+        "check": "node tools/content-index.mjs --check && prettier --check . && eslint .",
         "check:changed": "node tools/check-changed.mjs",
         "test": "node --test tests/*.test.mjs"
     },

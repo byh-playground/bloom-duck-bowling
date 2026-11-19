@@ -1,4 +1,4 @@
-import { routeDefinition } from './arena.mjs';
+import { DEFAULT_ROUTE, routeDefinition } from './arena.mjs';
 import { manualBounds } from './locomotion.mjs';
 
 const GATE_WIDTH = 220;
@@ -76,7 +76,7 @@ function visibleGates(state) {
         ];
     });
 }
-export function createExpedition(route = 'grove') {
+export function createExpedition(route = DEFAULT_ROUTE) {
     const room = makeRoom(0, 0, 0, route);
     const state = {
         route,
