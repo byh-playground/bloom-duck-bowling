@@ -1,12 +1,15 @@
+import { nextRandom } from './random.mjs';
+
 export function createReflector(
-    { x, y, length, width, angleRad, height, respawnMs },
-    originX = 0,
-    originY = 0,
+    { positions, length, width, angleRad, height, respawnMs },
+    originX,
+    originY,
+    seed,
 ) {
-    const centerX = x + originX;
-    const centerY = y + originY;
     if (
-        ![centerX, centerY, length, width, angleRad, height].every(Number.isFinite) ||
+        !Array.isArray(positions) ||
+        !positions.length ||
+        ![length, width, angleRad, height].every(Number.isFinite) ||
         length <= 0 ||
         width <= 0 ||
         height <= 0 ||
@@ -15,34 +18,65 @@ export function createReflector(
     ) {
         throw new RangeError('Invalid reflector dimensions or position');
     }
-    const cos = Math.cos(angleRad);
-    const sin = Math.sin(angleRad);
-    const halfLength = length / 2;
-    const halfWidth = width / 2;
-    const corner = (along, across) =>
-        Object.freeze({
-            x: centerX + along * cos - across * sin,
-            y: centerY + along * sin + across * cos,
-        });
+    const shape = {
+        height,
+        cos: Math.cos(angleRad),
+        sin: Math.sin(angleRad),
+        halfLength: length / 2,
+        halfWidth: width / 2,
+    };
+    const slots = Object.freeze(
+        positions.map(({ x, y }) => {
+            if (!Number.isFinite(x) || !Number.isFinite(y)) {
+                throw new RangeError('Invalid reflector position');
+            }
+            const centerX = x + originX;
+            const centerY = y + originY;
+            const { cos, sin, halfLength, halfWidth } = shape;
+            const corner = (along, across) =>
+                Object.freeze({
+                    x: centerX + along * cos - across * sin,
+                    y: centerY + along * sin + across * cos,
+                });
+            return Object.freeze({
+                ...shape,
+                x: centerX,
+                y: centerY,
+                corners: Object.freeze([
+                    corner(-halfLength, -halfWidth),
+                    corner(halfLength, -halfWidth),
+                    corner(halfLength, halfWidth),
+                    corner(-halfLength, halfWidth),
+                ]),
+            });
+        }),
+    );
+    if (new Set(slots.map(({ x, y }) => x + ',' + y)).size !== slots.length) {
+        throw new RangeError('Reflector positions must not repeat');
+    }
+    const initial = nextRandom(seed >>> 0);
+    const lifecycle = {
+        returnAtMs: null,
+        slotIndex: Math.floor(initial.value * slots.length),
+        seed: initial.seed,
+    };
     return Object.freeze({
-        x: centerX,
-        y: centerY,
+        ...shape,
         length,
         width,
         angleRad,
-        height,
         respawnMs,
-        lifecycle: { returnAtMs: null },
-        cos,
-        sin,
-        halfLength,
-        halfWidth,
-        corners: Object.freeze([
-            corner(-halfLength, -halfWidth),
-            corner(halfLength, -halfWidth),
-            corner(halfLength, halfWidth),
-            corner(-halfLength, halfWidth),
-        ]),
+        lifecycle,
+        slots,
+        get x() {
+            return slots[lifecycle.slotIndex].x;
+        },
+        get y() {
+            return slots[lifecycle.slotIndex].y;
+        },
+        get corners() {
+            return slots[lifecycle.slotIndex].corners;
+        },
     });
 }
 
@@ -73,7 +107,17 @@ export function reflectorOverlaps(body, rock, bottom = 0) {
 
 export function restoreReflector(rock, nowMs, occupied) {
     const { returnAtMs } = rock.lifecycle;
-    if (returnAtMs === null || nowMs < returnAtMs || occupied()) return false;
+    if (returnAtMs === null || nowMs < returnAtMs) return false;
+    const available = rock.slots.flatMap((slot, index) =>
+        (rock.slots.length > 1 && index === rock.lifecycle.slotIndex) || occupied(slot)
+            ? []
+            : [index],
+    );
+    if (!available.length) return false;
+
+    const { seed, value } = nextRandom(rock.lifecycle.seed);
+    rock.lifecycle.seed = seed;
+    rock.lifecycle.slotIndex = available[Math.floor(value * available.length)];
     rock.lifecycle.returnAtMs = null;
     return true;
 }

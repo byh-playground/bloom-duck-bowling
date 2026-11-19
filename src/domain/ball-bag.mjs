@@ -1,3 +1,5 @@
+import { nextRandom } from './random.mjs';
+
 // One draw per actual player shot. Independent of the campaign's enemy RNG.
 export class BallBag {
     #types;
@@ -11,11 +13,9 @@ export class BallBag {
         this.#state = seed >>> 0;
     }
     #random() {
-        // Mulberry32: mix adjacent run seeds before each Fisher–Yates draw.
-        let n = (this.#state = (this.#state + 0x6d2b79f5) >>> 0);
-        n = Math.imul(n ^ (n >>> 15), n | 1);
-        n ^= n + Math.imul(n ^ (n >>> 7), n | 61);
-        return ((n ^ (n >>> 14)) >>> 0) / 4294967296;
+        const { seed, value } = nextRandom(this.#state);
+        this.#state = seed;
+        return value;
     }
     draw() {
         const bag = this.#remaining;

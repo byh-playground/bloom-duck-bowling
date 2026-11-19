@@ -150,7 +150,7 @@ export class CampaignGame extends BowlingGame {
         this.endless = false;
         this.airCatches = 0;
         this.route = ACTIVE_ROUTE.id;
-        this.expedition = expedition ? createExpedition(this.route) : null;
+        this.expedition = expedition ? createExpedition(this.route, shotSeed) : null;
         if (this.expedition) this.arena = this.boss.arena = this.expedition.room.arena;
         this.stageIndex = 0;
         this.stageMin = STAGE_MIN_SECONDS;
