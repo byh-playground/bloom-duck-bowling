@@ -1,4 +1,5 @@
 import { ARENA } from './arena.mjs';
+import { resolveReflectors } from './terrain.mjs';
 // Deliberately slower than approaching enemies. No teleport, invulnerability or global path slots.
 export const MOBILITY = {
     minX: ARENA.left + 120,
@@ -147,6 +148,11 @@ export function stepManual(g, dt) {
         w = g.duckBounds ?? MANUAL;
     b.x = clamp(x + dx * speed * moveDt, w.minX, w.maxX);
     b.y = clamp(y + dy * speed * moveDt, w.minY, w.maxY);
+    if (g.arena?.reflectors) {
+        resolveReflectors(b, g.arena.reflectors, b.recoil?.z ?? 0, 0, null);
+        b.x = clamp(b.x, w.minX, w.maxX);
+        b.y = clamp(b.y, w.minY, w.maxY);
+    }
     b.moveVx = (b.x - x) / dt;
     b.moveVy = (b.y - y) / dt;
     const d = Math.hypot(b.x - x, b.y - y);

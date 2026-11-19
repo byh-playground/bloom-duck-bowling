@@ -33,6 +33,11 @@ const MIX = {
             category: 'action',
             layers: [tone(205, 69, 103, 0.38), noise(630, 75, 0.21)],
         },
+        rockHit: {
+            category: 'impact',
+            priority: 3,
+            layers: [noise(1750, 33, 0.32), tone(135, 68, 95, 0.38)],
+        },
         pinHit: {
             category: 'impact',
             priority: 4,

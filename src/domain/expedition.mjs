@@ -1,5 +1,6 @@
 import { DEFAULT_ROUTE, routeDefinition } from './arena.mjs';
 import { manualBounds } from './locomotion.mjs';
+import { createReflector } from './terrain.mjs';
 
 const GATE_WIDTH = 220;
 const directions = Object.freeze([
@@ -26,7 +27,7 @@ function makeRoom(col, row, index, route) {
         top = edgeAt(row, base.top, rowDepth),
         width = column(col),
         height = rowDepth(row),
-        info = trail[index];
+        { reflectors, ...info } = trail[index];
     const arena = Object.freeze({
         left,
         top,
@@ -37,6 +38,9 @@ function makeRoom(col, row, index, route) {
         centerX: left + width * 0.5,
         centerY: top + height * 0.5,
         enclosedPins: true,
+        ...(reflectors && {
+            reflectors: Object.freeze(reflectors.map((def) => createReflector(def, left, top))),
+        }),
     });
     return Object.freeze({
         id: idFor(col, row),

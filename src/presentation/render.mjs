@@ -1,5 +1,6 @@
 import { arenaForRoute, rackEntrance, routeDefinition } from '../domain/arena.mjs';
 import { BALL_TYPES, predictRoll, prepareRoll, rollBounds } from '../domain/dynamics.mjs';
+import { drawReflector } from './reflector.mjs';
 import { shieldGuardUp } from '../domain/enemies.mjs';
 import { bowlerPose, bowlerRecoilPoint, FOLLOW_TIME, releasePoint } from '../domain/bowler.mjs';
 import { bowlerDefinition } from '../domain/bowlers.mjs';
@@ -1037,7 +1038,12 @@ function scoreFeedback(c, events, shift = { x: 0, y: 0 }, view) {
     }
 }
 export const drawDepth = (o, type) =>
-    cameraDepth(o.x, o.y, (o.recoil?.z ?? o.z ?? 0) + (type === 'boss' ? 58 : o.r || 0));
+    cameraDepth(
+        o.x,
+        o.y,
+        (o.recoil?.z ?? o.z ?? 0) +
+            (type === 'boss' ? 58 : type === 'reflector' ? o.height / 2 : o.r || 0),
+    );
 export function expeditionCameraShift(expedition) {
     return expedition?.room
         ? worldVectorToScreen(
@@ -1161,6 +1167,7 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
     }
     const objects = [
         { o: g.boss, type: 'boss' },
+        ...(arena.reflectors ?? []).map((o) => ({ o, type: 'reflector' })),
         ...enemies.filter(drawEnemy).map((o) => ({ o, type: 'enemy' })),
         ...liveBalls.filter((b) => !b.held).map((o) => ({ o, type: 'ball' })),
         ...liveShots.map((o) => ({ o, type: 'projectile' })),
@@ -1172,7 +1179,8 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
                 o,
                 liveBalls.find((b) => b.held),
             );
-        } else if (type === 'enemy') enemy(c, o);
+        } else if (type === 'reflector') drawReflector(c, o, { polygon, line });
+        else if (type === 'enemy') enemy(c, o);
         else if (type === 'projectile') enemyShot(c, o, threatInk);
         else ball(c, o);
     }
@@ -1398,6 +1406,7 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
                     const prev = points[i - 1],
                         q = points[i];
                     if (
+                        q.rockHit ||
                         (prev.vx * q.vx < 0 && (q.x <= walls.left || q.x >= walls.right)) ||
                         (prev.vy * q.vy < 0 && (q.y <= walls.top || q.y >= walls.bottom))
                     ) {
@@ -1454,7 +1463,7 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
                 );
                 label(
                     c,
-                    '벽반사·훅 예측 · 충돌·회수 시 달라짐',
+                    '반사·훅 예측 · 핀 충돌·회수 시 달라짐',
                     CAMERA.width / 2,
                     CAMERA.height - 11,
                     10,
