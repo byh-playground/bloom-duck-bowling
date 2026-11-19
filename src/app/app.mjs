@@ -2,7 +2,8 @@ import { createLoop } from '@bloom-gamekit/simloop';
 import { ROUTES, isRouteUnlocked, routeDefinition } from '../domain/arena.mjs';
 import { BOWLERS, DEFAULT_BOWLER } from '../domain/bowlers.mjs';
 import { STEP_SECONDS, TICK_RATE_HZ, MAX_FRAME_STEPS } from '../domain/timing.mjs';
-import { button, message, renderMapCards } from './front-menu.mjs';
+import { installDuelUI } from './duel-ui.mjs';
+import { bindTabs, button, message, renderMapCards } from './front-menu.mjs';
 import { CampaignGame, AUGMENTS, STAGES } from '../domain/campaign.mjs';
 import {
     defaultProfile,
@@ -180,6 +181,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         audio?.setBackground(screen === 'game' ? 'playing' : 'home');
     }
     function showHome() {
+        duel?.leaveLobby();
         setScreen('home');
         $('play').focus({ preventScroll: true });
     }
@@ -189,6 +191,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         notice.hidden = !unlockNotices.length;
         notice.textContent = unlockNotices.join(' ');
         setScreen('maps');
+        selectMode($('campaign-tab'));
         $('maps-title').focus({ preventScroll: true });
     }
     function startRun(route) {
@@ -213,11 +216,15 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         showMenu(null);
         showMaps(unlockNotices);
     }
+    const duel = showcaseDemo ? null : installDuelUI();
+    const selectMode = bindTabs(document.querySelector('.start-tabs'), (tab) => {
+        if (tab.id !== 'duel-tab') duel?.leaveLobby();
+    });
     $('play').addEventListener('click', () => showMaps());
     $('maps-back').addEventListener('click', showHome);
     $('home-settings').addEventListener('click', () => openSettings(null));
     $('maps-screen').addEventListener('keydown', (event) => {
-        if (event.key !== 'Escape') return;
+        if (event.key !== 'Escape' || event.defaultPrevented) return;
         event.preventDefault();
         showHome();
     });

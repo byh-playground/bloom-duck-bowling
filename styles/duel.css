@@ -1,28 +1,13 @@
-.front-actions:has(#duel-open:not([hidden])) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-@media (min-width: 650px) {
-    .front-actions:has(#duel-open:not([hidden])) {
-        grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr));
-    }
-}
-
 #duel-dialog {
-    width: min(calc(100% - 24px), 430px);
-    max-height: calc(100dvh - 20px);
+    width: min(calc(100% - 16px), 655px);
+    height: calc(100dvh - 16px);
+    max-height: none;
     padding: 0;
     overflow: auto;
     border: 1px solid var(--duck-rail);
     border-radius: 16px;
     background: var(--duck-panel);
     color: var(--duck-ink);
-}
-
-#duel-dialog:has(#duel-match:not([hidden])) {
-    width: min(calc(100% - 16px), 655px);
-    height: calc(100dvh - 16px);
-    max-height: none;
 }
 
 #duel-dialog::backdrop {
@@ -33,11 +18,6 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    min-height: 100%;
-    padding: clamp(10px, 4vw, 20px);
-}
-
-#duel-dialog:has(#duel-match:not([hidden])) .duel-shell {
     height: 100%;
     padding: 8px;
 }
@@ -62,7 +42,7 @@
 }
 
 #duel-dialog button,
-#duel-dialog input {
+.duel-lobby input {
     min-height: 44px;
     padding: 6px 10px;
     border: 1px solid var(--duck-border);
@@ -72,7 +52,8 @@
     background: var(--duck-button);
 }
 
-#duel-dialog .duel-primary {
+#duel-dialog .duel-primary,
+.duel-lobby .duel-primary {
     border-color: var(--duck-primary);
     background: var(--duck-primary);
     color: var(--duck-primary-ink);
@@ -80,9 +61,46 @@
 }
 
 .duel-lobby,
-.duel-join {
+.duel-join,
+.duel-picker {
     display: grid;
     gap: 8px;
+}
+
+.duel-lobby,
+.duel-picker button {
+    border: 1px solid var(--duck-rail);
+    border-radius: 12px;
+    padding: clamp(12px, 3vw, 20px);
+    background: var(--duck-panel);
+}
+
+.duel-lobby h2 {
+    margin: 0 0 4px;
+    font-size: 19px;
+}
+
+.duel-picker button {
+    display: grid;
+    justify-items: start;
+    gap: 4px;
+    color: var(--duck-ink);
+    text-align: left;
+}
+
+.duel-picker button strong {
+    font-size: 18px;
+}
+
+.duel-picker button span {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--duck-muted-ink);
+}
+
+.duel-picker button:hover {
+    border-color: var(--duck-primary);
+    background: var(--duck-button);
 }
 
 .duel-join {
