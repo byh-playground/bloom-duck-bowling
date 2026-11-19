@@ -785,14 +785,14 @@ export class BowlingGame {
             const restored = restoreReflector(
                 rock,
                 this.terrainTimeMs,
-                () =>
-                    reflectorOverlaps(this.boss, rock, this.boss.recoil?.z ?? 0) ||
-                    this.enemies.some((pin) => reflectorOverlaps(pin, rock, pin.z)) ||
+                (slot) =>
+                    reflectorOverlaps(this.boss, slot, this.boss.recoil?.z ?? 0) ||
+                    this.enemies.some((pin) => reflectorOverlaps(pin, slot, pin.z)) ||
                     this.balls.some(
                         (ball) =>
-                            (ball.inWorld || ball.held) && reflectorOverlaps(ball, rock, ball.z),
+                            (ball.inWorld || ball.held) && reflectorOverlaps(ball, slot, ball.z),
                     ) ||
-                    (this.echoes ?? []).some((ball) => reflectorOverlaps(ball, rock, ball.z)),
+                    (this.echoes ?? []).some((ball) => reflectorOverlaps(ball, slot, ball.z)),
             );
             if (restored) this.fx('rock-return', rock.x, rock.y, 0, rock.width);
         }

@@ -26,8 +26,12 @@ export default {
             stage: 0,
             reflectors: [
                 {
-                    x: 431,
-                    y: 800,
+                    positions: [
+                        { x: 145, y: 790 },
+                        { x: 150, y: 870 },
+                        { x: 431, y: 800 },
+                        { x: 425, y: 866 },
+                    ],
                     length: 110,
                     width: 52,
                     angleRad: Math.PI / 2,

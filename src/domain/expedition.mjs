@@ -19,7 +19,7 @@ function edgeAt(index, origin, sizeAt) {
     return edge;
 }
 const idFor = (col, row) => `${col},${row}`;
-function makeRoom(col, row, index, route) {
+function makeRoom(col, row, index, route, seed) {
     const { arena: base, trail, widths, depths } = routeDefinition(route);
     const column = (i) => (i === 0 ? base.width : widths[(Math.abs(i) - 1) % widths.length]);
     const rowDepth = (i) => (i === 0 ? base.height : depths[(Math.abs(i) - 1) % depths.length]);
@@ -39,7 +39,16 @@ function makeRoom(col, row, index, route) {
         centerY: top + height * 0.5,
         enclosedPins: true,
         ...(reflectors && {
-            reflectors: Object.freeze(reflectors.map((def) => createReflector(def, left, top))),
+            reflectors: Object.freeze(
+                reflectors.map((def, number) =>
+                    createReflector(
+                        def,
+                        left,
+                        top,
+                        seed ^ Math.imul(col, 73856093) ^ Math.imul(row, 19349663) ^ number,
+                    ),
+                ),
+            ),
         }),
     });
     return Object.freeze({
@@ -75,15 +84,16 @@ function visibleGates(state) {
                 open: false,
                 x: d.axis === 'x' ? (d.sign < 0 ? a.left : a.right) : room.centerX,
                 y: d.axis === 'y' ? a.top : room.centerY,
-                to: makeRoom(col, row, room.index + 1, state.route),
+                to: makeRoom(col, row, room.index + 1, state.route, state.terrainSeed),
             },
         ];
     });
 }
-export function createExpedition(route = DEFAULT_ROUTE) {
-    const room = makeRoom(0, 0, 0, route);
+export function createExpedition(route = DEFAULT_ROUTE, terrainSeed = 42) {
+    const room = makeRoom(0, 0, 0, route, terrainSeed);
     const state = {
         route,
+        terrainSeed,
         phase: 'combat',
         room,
         cameraX: room.centerX,
