@@ -1,6 +1,6 @@
 import { PHYSICS_STEP_SECONDS } from './timing.mjs';
 import { ARENA } from './arena.mjs';
-import { resolveReflectors } from './terrain.mjs';
+import { reflectorIsActive, resolveReflectors } from './terrain.mjs';
 // Live balls and the shot preview share the same motion and static terrain contacts.
 export const BALL_TYPES = {
     basic: {
@@ -111,7 +111,7 @@ export function stepRoll(b, dt, arena = b.arena) {
     b.vy *= drag;
     b.rockHit = arena?.reflectors
         ? resolveReflectors(b, arena.reflectors, b.z ?? 0, p.bounce)
-        : false;
+        : null;
     b.wallHit = false;
     b.wallHitSides = [];
     const w = rollBounds(b.r || 23, arena);
@@ -151,12 +151,16 @@ export function stepRoll(b, dt, arena = b.arena) {
 export function predictRoll(input, duration = 1.1) {
     const b = prepareRoll({ ...input, r: 23 }),
         points = [{ x: b.x, y: b.y, vx: b.vx, vy: b.vy, time: 0 }];
+    const remaining = b.arena?.reflectors?.filter(reflectorIsActive);
+    if (remaining) b.arena = { ...b.arena, reflectors: remaining };
     let t = 0;
     while (t < duration - 1e-9) {
         const dt = Math.min(PHYSICS_STEP_SECONDS, duration - t);
         stepRoll(b, dt);
         t += dt;
-        points.push({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, time: t, rockHit: b.rockHit });
+        const rockHit = Boolean(b.rockHit);
+        if (rockHit) remaining.splice(remaining.indexOf(b.rockHit), 1);
+        points.push({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, time: t, rockHit });
         if (Math.hypot(b.vx, b.vy) < 85) break;
     }
     return points;
