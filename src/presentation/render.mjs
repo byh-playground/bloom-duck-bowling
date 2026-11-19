@@ -1,6 +1,7 @@
 import { arenaForRoute, rackEntrance, routeDefinition } from '../domain/arena.mjs';
 import { BALL_TYPES, predictRoll, prepareRoll, rollBounds } from '../domain/dynamics.mjs';
-import { drawReflector } from './reflector.mjs';
+import { drawReflector, drawReflectorBreak } from './reflector.mjs';
+import { reflectorIsActive } from '../domain/terrain.mjs';
 import { shieldGuardUp } from '../domain/enemies.mjs';
 import { bowlerPose, bowlerRecoilPoint, FOLLOW_TIME, releasePoint } from '../domain/bowler.mjs';
 import { bowlerDefinition } from '../domain/bowlers.mjs';
@@ -1167,7 +1168,9 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
     }
     const objects = [
         { o: g.boss, type: 'boss' },
-        ...(arena.reflectors ?? []).map((o) => ({ o, type: 'reflector' })),
+        ...(arena.reflectors ?? [])
+            .filter(reflectorIsActive)
+            .map((o) => ({ o, type: 'reflector' })),
         ...enemies.filter(drawEnemy).map((o) => ({ o, type: 'enemy' })),
         ...liveBalls.filter((b) => !b.held).map((o) => ({ o, type: 'ball' })),
         ...liveShots.map((o) => ({ o, type: 'projectile' })),
@@ -1253,6 +1256,20 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
         c.restore();
     }
     for (const e of (g.effects || []).filter(seen)) {
+        if (e.kind === 'rock-break') {
+            drawReflectorBreak(c, e, { polygon });
+            continue;
+        }
+        if (e.kind === 'rock-return') {
+            const p = project(e.x, e.y);
+            const t = e.age / e.life;
+            const r = e.size * CAMERA.scale * (0.65 + 0.55 * t);
+            c.save();
+            c.globalAlpha = (1 - t) * 0.5;
+            ellipse(c, p.x, p.y, r, r * Math.sin(CAMERA.pitch), null, '#c7d4cf', 2);
+            c.restore();
+            continue;
+        }
         const contactStyle = AUGMENT_CONTACT_INK[e.kind];
         if (contactStyle) {
             augmentContact(c, e, contactStyle);

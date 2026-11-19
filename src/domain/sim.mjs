@@ -2,7 +2,13 @@ import { STEP_SECONDS, PHYSICS_STEP_SECONDS, MAX_FRAME_SECONDS } from './timing.
 import { ARENA } from './arena.mjs';
 import { configureEnemy, shieldFront, specialDrive, ignite, stepBombs } from './enemies.mjs';
 import { BALL_TYPES, prepareRoll, stepRoll } from './dynamics.mjs';
-import { resolveReflectors } from './terrain.mjs';
+import {
+    breakReflector,
+    reflectorIsActive,
+    reflectorOverlaps,
+    resolveReflectors,
+    restoreReflector,
+} from './terrain.mjs';
 import { startPinMagnet, stepBallCaroms, stepPinMagnets } from './extra-augments.mjs';
 import {
     MEANINGFUL_BALL_IMPACT,
@@ -755,9 +761,46 @@ export class BowlingGame {
         }
         u.attackTelegraph = u.attackStage === 'warn' ? 1 - u.attackTimer / 0.45 : 0;
     }
+    get terrainTimeMs() {
+        return this.combatClock?.nowMs ?? Math.floor(this.time * 1000);
+    }
+    handleReflectorHit(ball) {
+        const rock = ball.rockHit;
+        if (!rock) return;
+        breakReflector(rock, this.terrainTimeMs);
+        this.stats.rockBounces++;
+        this.lastRockBounce = {
+            x: ball.x,
+            y: ball.y,
+            vx: ball.vx,
+            vy: ball.vy,
+            ballId: ball.id,
+            time: this.time,
+        };
+        this.fx('rock-break', rock.x, rock.y, rock.height * 0.4, rock.width * 0.6);
+        this.onEvent?.('rockHit', (Math.hypot(ball.vx, ball.vy) * ball.mass) / 20);
+    }
+    restoreArenaReflectors() {
+        for (const rock of this.arena.reflectors ?? []) {
+            const restored = restoreReflector(
+                rock,
+                this.terrainTimeMs,
+                () =>
+                    reflectorOverlaps(this.boss, rock, this.boss.recoil?.z ?? 0) ||
+                    this.enemies.some((pin) => reflectorOverlaps(pin, rock, pin.z)) ||
+                    this.balls.some(
+                        (ball) =>
+                            (ball.inWorld || ball.held) && reflectorOverlaps(ball, rock, ball.z),
+                    ) ||
+                    (this.echoes ?? []).some((ball) => reflectorOverlaps(ball, rock, ball.z)),
+            );
+            if (restored) this.fx('rock-return', rock.x, rock.y, 0, rock.width);
+        }
+    }
     tick(dt) {
         if (this.phase !== 'playing') return;
         if (this.combatClock) advanceCombatClock(this.combatClock, dt, this.realTimeScale ?? 1);
+        if (this.arena.reflectors) this.restoreArenaReflectors();
         const bossPrevious = { x: this.boss.x, y: this.boss.y, z: this.boss.recoil?.z ?? 0 },
             ballPrevious = this.balls.map((b) => ({
                 x: b.x,
@@ -849,19 +892,7 @@ export class BowlingGame {
             b.life -= dt;
             b.age += dt;
             stepRoll(b, dt, b.arena ?? this.arena);
-            if (b.rockHit) {
-                this.stats.rockBounces++;
-                this.lastRockBounce = {
-                    x: b.x,
-                    y: b.y,
-                    vx: b.vx,
-                    vy: b.vy,
-                    ballId: b.id,
-                    time: this.time,
-                };
-                this.fx('hit', b.x, b.y, 0, 17, '#d5e7e8');
-                this.onEvent?.('rockHit', (Math.hypot(b.vx, b.vy) * b.mass) / 20);
-            }
+            if (b.rockHit) this.handleReflectorHit(b);
             stepBallVault(this, b, dt);
             if (deferProjectiles)
                 ballPrevious[b.id].end = { x: b.x, y: b.y, z: b.z, vault: !!b.vault };
@@ -1025,6 +1056,12 @@ export class BowlingGame {
                 this.dashCharges === this.dashCapacity
                     ? 0
                     : Math.max(0, Math.min(1, 1 - this.dashRechargeRemaining / 0.5)),
+            reflectors: (this.arena.reflectors ?? []).map((rock) => ({
+                x: rock.x,
+                y: rock.y,
+                active: reflectorIsActive(rock),
+                returnAtMs: rock.lifecycle.returnAtMs,
+            })),
             lastRockBounce: this.lastRockBounce ? { ...this.lastRockBounce } : null,
             lastWallBounce: this.lastWallBounce
                 ? { ...this.lastWallBounce, sides: [...this.lastWallBounce.sides] }

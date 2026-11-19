@@ -1,5 +1,5 @@
 export function createReflector(
-    { x, y, length, width, angleRad, height },
+    { x, y, length, width, angleRad, height, respawnMs },
     originX = 0,
     originY = 0,
 ) {
@@ -9,7 +9,9 @@ export function createReflector(
         ![centerX, centerY, length, width, angleRad, height].every(Number.isFinite) ||
         length <= 0 ||
         width <= 0 ||
-        height <= 0
+        height <= 0 ||
+        !Number.isSafeInteger(respawnMs) ||
+        respawnMs <= 0
     ) {
         throw new RangeError('Invalid reflector dimensions or position');
     }
@@ -29,6 +31,8 @@ export function createReflector(
         width,
         angleRad,
         height,
+        respawnMs,
+        lifecycle: { returnAtMs: null },
         cos,
         sin,
         halfLength,
@@ -42,14 +46,41 @@ export function createReflector(
     });
 }
 
-function resolveReflector(body, rock, restitution, velocity) {
-    const { cos, sin, halfLength, halfWidth } = rock;
+export const reflectorIsActive = (rock) => rock.lifecycle.returnAtMs === null;
+
+export function breakReflector(rock, nowMs) {
+    rock.lifecycle.returnAtMs = nowMs + rock.respawnMs;
+}
+
+function reflectorOffset(body, rock) {
     const dx = body.x - rock.x;
     const dy = body.y - rock.y;
-    const along = dx * cos + dy * sin;
-    const across = -dx * sin + dy * cos;
-    const excessAlong = Math.abs(along) - halfLength;
-    const excessAcross = Math.abs(across) - halfWidth;
+    const along = dx * rock.cos + dy * rock.sin;
+    const across = -dx * rock.sin + dy * rock.cos;
+    return {
+        along,
+        across,
+        excessAlong: Math.abs(along) - rock.halfLength,
+        excessAcross: Math.abs(across) - rock.halfWidth,
+    };
+}
+
+export function reflectorOverlaps(body, rock, bottom = 0) {
+    if (bottom >= rock.height) return false;
+    const { excessAlong, excessAcross } = reflectorOffset(body, rock);
+    return Math.hypot(Math.max(0, excessAlong), Math.max(0, excessAcross)) < body.r;
+}
+
+export function restoreReflector(rock, nowMs, occupied) {
+    const { returnAtMs } = rock.lifecycle;
+    if (returnAtMs === null || nowMs < returnAtMs || occupied()) return false;
+    rock.lifecycle.returnAtMs = null;
+    return true;
+}
+
+function resolveReflector(body, rock, restitution, velocity) {
+    const { cos, sin } = rock;
+    const { along, across, excessAlong, excessAcross } = reflectorOffset(body, rock);
     const radius = body.r;
     if (excessAlong >= radius || excessAcross >= radius) return false;
 
@@ -90,12 +121,14 @@ function resolveReflector(body, rock, restitution, velocity) {
 }
 
 export function resolveReflectors(body, reflectors, bottom = 0, restitution = 0, velocity = body) {
-    if (!reflectors?.length) return false;
-    let reflected = false;
+    if (!reflectors?.length) return null;
     for (const rock of reflectors) {
-        if (bottom < rock.height && resolveReflector(body, rock, restitution, velocity)) {
-            reflected = true;
-        }
+        if (
+            reflectorIsActive(rock) &&
+            bottom < rock.height &&
+            resolveReflector(body, rock, restitution, velocity)
+        )
+            return rock;
     }
-    return reflected;
+    return null;
 }

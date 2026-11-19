@@ -228,6 +228,7 @@ export function afterBattleStep(g, dt, dashSegment) {
         b.life -= dt;
         if (b.life <= 0) continue;
         stepRoll(b, dt, b.arena ?? g.arena);
+        if (b.rockHit) g.handleReflectorHit(b);
         b.trail.push({ x: b.x, y: b.y });
         if (b.trail.length > 7) b.trail.shift();
         for (const u of g.enemies) g.ballContact(b, u);

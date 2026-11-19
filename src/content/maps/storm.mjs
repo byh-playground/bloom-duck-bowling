@@ -25,7 +25,15 @@ export default {
             packets: 2,
             stage: 0,
             reflectors: [
-                { x: 435, y: 790, length: 120, width: 44, angleRad: Math.PI / 2, height: 30 },
+                {
+                    x: 431,
+                    y: 800,
+                    length: 110,
+                    width: 52,
+                    angleRad: Math.PI / 2,
+                    height: 30,
+                    respawnMs: 5000,
+                },
             ],
         },
         { title: '빗물 굽이', decor: 'rainbend', packets: 2, stage: 1 },
