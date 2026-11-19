@@ -2,6 +2,13 @@ import { clampRollPoint } from './dynamics.mjs';
 // Shared world-space skeleton: the visible hand and physical ball use the same pose.
 export const SWING_TIME = 0.22,
     FOLLOW_TIME = 0.28;
+export const DASH_POSE_SECONDS = 330 / 1000;
+
+export function advanceDashPose(bowler, dt) {
+    if (Number.isFinite(bowler.dashPose))
+        bowler.dashPose = Math.min(DASH_POSE_SECONDS, bowler.dashPose + dt);
+}
+
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v)),
     mix = (a, b, t) => a + (b - a) * t;
 // Recoil is supplied by the collision simulation; every limb and the ball share one roll basis.
@@ -41,14 +48,14 @@ export function bowlerPose(b) {
         !recoil &&
         phase === 'idle' &&
         dashAge >= 0 &&
-        dashAge < 0.33 &&
+        dashAge < DASH_POSE_SECONDS &&
         Math.hypot(b.dashX || 0, b.dashY || 0) > 0;
     const drive = dash
         ? dashAge < 0.045
             ? mix(0.58, 1, dashAge / 0.045)
             : dashAge < 0.15
               ? 1
-              : ((0.33 - dashAge) / 0.18) ** 2
+              : ((DASH_POSE_SECONDS - dashAge) / 0.18) ** 2
         : 0;
     const face = dash ? Math.atan2(b.dashY, b.dashX) : (b.facing ?? -Math.PI / 2),
         dx = Math.cos(face),

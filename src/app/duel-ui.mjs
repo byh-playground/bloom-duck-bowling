@@ -57,6 +57,7 @@ export function installDuelUI() {
     const canvas = $('duel-game');
     const pad = $('duel-throw');
     const stick = $('duel-stick');
+    const controls = dialog.querySelector('.duel-controls');
     const result = $('duel-result');
     const ctx = canvas.getContext('2d');
     const padCtx = pad.getContext('2d');
@@ -144,8 +145,7 @@ export function installDuelUI() {
         if (pad.width !== w) pad.width = w;
         if (pad.height !== h) pad.height = h;
         const available = canPlay();
-        pad.setAttribute('aria-disabled', String(!canThrow()));
-        stick.setAttribute('aria-disabled', String(!available));
+        updateInputAvailability();
         renderThrowPad(padCtx, aim, {
             width: w,
             height: h,
@@ -156,6 +156,11 @@ export function installDuelUI() {
             ready,
             keyboard: !!aim && throwInput.id === null,
         });
+    }
+
+    function updateInputAvailability() {
+        pad.setAttribute('aria-disabled', String(!canThrow()));
+        stick.setAttribute('aria-disabled', String(!canPlay()));
     }
 
     function setLobbyEnabled(enabled) {
@@ -177,6 +182,8 @@ export function installDuelUI() {
         previous?.controller?.close();
         match.hidden = true;
         result.hidden = true;
+        canvas.inert = false;
+        controls.inert = false;
         room.hidden = true;
         copy.hidden = true;
         room.textContent = '';
@@ -261,6 +268,10 @@ export function installDuelUI() {
                     if (active !== attempt || attempt.finished) return;
                     clearInput();
                     attempt.finished = true;
+                    canvas.inert = true;
+                    controls.inert = true;
+                    updateInputAvailability();
+                    padCtx.clearRect(0, 0, pad.width, pad.height);
                     setText(
                         $('duel-result-message'),
                         value === 'draw' ? '무승부' : value === attempt.side ? '승리!' : '패배',

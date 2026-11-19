@@ -1171,21 +1171,24 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
         ),
         ...(g.echoes || []).filter(seen),
     ];
-    for (const b of liveBalls)
-        if (!b.held && b.trail?.length > 1) {
-            c.save();
-            c.globalAlpha = 0.25;
-            line(
-                c,
-                b.trail.filter(seen).map((p) => project(p.x, p.y, p.z || 0)),
-                teamOf(b)?.light ?? '#fff0b1',
-                b.r * 0.8,
-            );
-            c.restore();
+    if (!g.duel?.ended) {
+        for (const b of liveBalls) {
+            if (!b.held && b.trail?.length > 1) {
+                c.save();
+                c.globalAlpha = 0.25;
+                line(
+                    c,
+                    b.trail.filter(seen).map((p) => project(p.x, p.y, p.z || 0)),
+                    teamOf(b)?.light ?? '#fff0b1',
+                    b.r * 0.8,
+                );
+                c.restore();
+            }
         }
-    if (g.controlMode === 'manual') {
-        if (bowlers) for (const player of bowlers) bowlerTrail(c, player.boss);
-        else bowlerTrail(c, g.boss);
+        if (g.controlMode === 'manual') {
+            if (bowlers) for (const player of bowlers) bowlerTrail(c, player.boss);
+            else bowlerTrail(c, g.boss);
+        }
     }
     const liveShots = (g.enemyProjectiles || []).filter(seen);
     for (const magnet of (g.pinMagnets || []).filter(seen)) magnetGround(c, magnet, g.time || 0);
