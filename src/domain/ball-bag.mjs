@@ -17,6 +17,14 @@ export class BallBag {
         this.#state = seed;
         return value;
     }
+    snapshot() {
+        return { seed: this.#state, last: this.#last ?? null, remaining: [...this.#remaining] };
+    }
+    restore({ seed, last, remaining }) {
+        this.#state = seed;
+        this.#last = last;
+        this.#remaining = [...remaining];
+    }
     draw() {
         const bag = this.#remaining;
         if (!bag.length) {
