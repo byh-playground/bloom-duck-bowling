@@ -257,6 +257,35 @@
     gap: clamp(8px, 1.6dvh, 13px);
 }
 
+.start-tabs {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--duck-rail);
+    border-radius: 12px;
+    background: var(--duck-hud);
+}
+
+.start-tabs button {
+    min-height: 44px;
+    border-color: transparent;
+    background: transparent;
+    color: var(--duck-ink);
+}
+
+.start-tabs button[aria-selected='true'] {
+    border-color: var(--duck-primary);
+    background: var(--duck-primary);
+    color: var(--duck-primary-ink);
+}
+
+#campaign-panel {
+    display: grid;
+    gap: clamp(8px, 1.6dvh, 13px);
+}
+
 .front-header {
     display: grid;
     grid-template-columns: 1fr auto 1fr;

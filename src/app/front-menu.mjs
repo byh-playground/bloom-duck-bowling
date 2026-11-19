@@ -23,6 +23,40 @@ export function message(tag, text, className = '') {
     return el;
 }
 
+export function bindTabs(tablist, onSelect) {
+    const tabs = [...tablist.querySelectorAll('[role="tab"]')];
+    function select(tab, focus = false) {
+        for (const item of tabs) {
+            const selected = item === tab;
+            item.setAttribute('aria-selected', String(selected));
+            item.tabIndex = selected ? 0 : -1;
+            document.getElementById(item.getAttribute('aria-controls')).hidden = !selected;
+        }
+        onSelect(tab);
+        if (focus) tab.focus({ preventScroll: true });
+    }
+    tablist.addEventListener('click', (event) => {
+        const tab = event.target.closest('[role="tab"]');
+        if (tabs.includes(tab)) select(tab, true);
+    });
+    tablist.addEventListener('keydown', (event) => {
+        const choices = tabs.filter((tab) => !tab.hidden);
+        const index = choices.indexOf(event.target);
+        if (index < 0) return;
+        const last = choices.length - 1;
+        const next = {
+            ArrowLeft: index === 0 ? last : index - 1,
+            ArrowRight: index === last ? 0 : index + 1,
+            Home: 0,
+            End: last,
+        }[event.key];
+        if (next === undefined) return;
+        event.preventDefault();
+        select(choices[next], true);
+    });
+    return select;
+}
+
 function createMapCard({ id, label, card: art }, unlocked, onStart) {
     const card = button('', () => onStart(id), 'map-card');
     for (const [field, property] of Object.entries(CARD_COLORS)) {
