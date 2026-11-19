@@ -1,3 +1,4 @@
+import { resolveReflectors } from './terrain.mjs';
 import { COMBAT_BEAT_MS, deadlineMs, remainingMs } from './combat-clock.mjs';
 import { MANUAL } from './locomotion.mjs';
 import { PIN_BLAST } from './pin-blast.mjs';
@@ -128,6 +129,11 @@ export function stepDuckRecoil(g, dt) {
     } else {
         const destination = Math.round(r.roll / TURN) * TURN;
         r.roll = destination + (r.roll - destination) * Math.exp(-DUCK_RECOIL.groundDrag * dt);
+    }
+    if (g.arena?.reflectors) {
+        resolveReflectors(b, g.arena.reflectors, r.z, DUCK_RECOIL.wallBounce, r);
+        b.x = Math.max(w.minX, Math.min(w.maxX, b.x));
+        b.y = Math.max(w.minY, Math.min(w.maxY, b.y));
     }
     const decay = Math.exp(-(r.landed ? DUCK_RECOIL.groundDrag : DUCK_RECOIL.airDrag) * dt);
     r.vx *= decay;

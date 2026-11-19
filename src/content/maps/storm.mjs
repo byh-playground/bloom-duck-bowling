@@ -19,7 +19,15 @@ export default {
     arena: { left: 10, right: 590, top: -20, bottom: 1170, enclosedPins: true },
     home: { y: 920, ballY: 1080 },
     trail: [
-        { title: '폭풍 협곡 입구', decor: 'ravine', packets: 2, stage: 0 },
+        {
+            title: '폭풍 협곡 입구',
+            decor: 'ravine',
+            packets: 2,
+            stage: 0,
+            reflectors: [
+                { x: 435, y: 790, length: 120, width: 44, angleRad: Math.PI / 2, height: 30 },
+            ],
+        },
         { title: '빗물 굽이', decor: 'rainbend', packets: 2, stage: 1 },
         { title: '번개 골짜기', decor: 'thunderpass', packets: 3, stage: 2 },
         { title: '폭풍의 문', decor: 'storm-gate', packets: 3, stage: 3 },

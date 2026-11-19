@@ -2,6 +2,7 @@ import { STEP_SECONDS, PHYSICS_STEP_SECONDS, MAX_FRAME_SECONDS } from './timing.
 import { ARENA } from './arena.mjs';
 import { configureEnemy, shieldFront, specialDrive, ignite, stepBombs } from './enemies.mjs';
 import { BALL_TYPES, prepareRoll, stepRoll } from './dynamics.mjs';
+import { resolveReflectors } from './terrain.mjs';
 import { startPinMagnet, stepBallCaroms, stepPinMagnets } from './extra-augments.mjs';
 import {
     MEANINGFUL_BALL_IMPACT,
@@ -118,6 +119,7 @@ export class BowlingGame {
         this.stats = {
             pickups: 0,
             wallBounces: 0,
+            rockBounces: 0,
             shots: 0,
             hits: 0,
             chainHits: 0,
@@ -523,8 +525,9 @@ export class BowlingGame {
         return Math.hypot(ax + t * dx, ay + t * dy, az + t * dz) <= r ? this.pickup(b) : false;
     }
     boundEnemy(u) {
-        const arena = u.arena ?? this.arena,
-            left = arena.left + u.r,
+        const arena = u.arena ?? this.arena;
+        if (arena.reflectors) resolveReflectors(u, arena.reflectors, u.z, 0);
+        const left = arena.left + u.r,
             right = arena.right - u.r,
             bottom = arena.bottom - u.r;
         if (u.x < left) {
@@ -846,6 +849,19 @@ export class BowlingGame {
             b.life -= dt;
             b.age += dt;
             stepRoll(b, dt, b.arena ?? this.arena);
+            if (b.rockHit) {
+                this.stats.rockBounces++;
+                this.lastRockBounce = {
+                    x: b.x,
+                    y: b.y,
+                    vx: b.vx,
+                    vy: b.vy,
+                    ballId: b.id,
+                    time: this.time,
+                };
+                this.fx('hit', b.x, b.y, 0, 17, '#d5e7e8');
+                this.onEvent?.('rockHit', (Math.hypot(b.vx, b.vy) * b.mass) / 20);
+            }
             stepBallVault(this, b, dt);
             if (deferProjectiles)
                 ballPrevious[b.id].end = { x: b.x, y: b.y, z: b.z, vault: !!b.vault };
@@ -1009,6 +1025,7 @@ export class BowlingGame {
                 this.dashCharges === this.dashCapacity
                     ? 0
                     : Math.max(0, Math.min(1, 1 - this.dashRechargeRemaining / 0.5)),
+            lastRockBounce: this.lastRockBounce ? { ...this.lastRockBounce } : null,
             lastWallBounce: this.lastWallBounce
                 ? { ...this.lastWallBounce, sides: [...this.lastWallBounce.sides] }
                 : null,
