@@ -662,7 +662,7 @@ export class BowlingGame {
         }
         return impact;
     }
-    enemyContact(a, b) {
+    enemyContact(a, b, onImpact) {
         if (a.z > 45 || b.z > 45 || Math.abs(a.z - b.z) > 30) return;
         const dx = b.x - a.x,
             dy = b.y - a.y,
@@ -703,6 +703,10 @@ export class BowlingGame {
             const source = a.sourceShot != null ? a : b,
                 shot = source.sourceShot,
                 depth = source.chainDepth + 1;
+            if (onImpact) {
+                onImpact(a, b, impulse, shot, depth);
+                return;
+            }
             for (const u of [a, b]) {
                 if (u.hp > 0) {
                     this.hurt(
@@ -797,6 +801,68 @@ export class BowlingGame {
             if (restored) this.fx('rock-return', rock.x, rock.y, 0, rock.width);
         }
     }
+    advanceDashCharge(dt) {
+        if (this.dashCharges < this.dashCapacity) {
+            this.dashRechargeRemaining -= dt * (this.realTimeScale ?? 1);
+            while (this.dashRechargeRemaining <= 1e-10 && this.dashCharges < this.dashCapacity) {
+                this.dashCharges++;
+                this.dashRechargeRemaining =
+                    this.dashCharges === this.dashCapacity ? 0 : this.dashRechargeRemaining + 0.5;
+            }
+        }
+    }
+    advanceBall(b, dt, previousRecord, bossPrevious, deferProjectiles = false, afterMotion) {
+        if (b.ready) return;
+        const previous = previousRecord.inWorld ? previousRecord : { x: b.x, y: b.y, z: b.z };
+        if (b.life <= 0) {
+            if (this.checkPickup(b, previous, bossPrevious)) return;
+            b.cooldown -= dt;
+            if (b.cooldown <= 0) {
+                b.ready = true;
+                b.inWorld = false;
+                b.pickupArmed = false;
+                b.z = 0;
+                b.x = b.homeX;
+                b.y = b.homeY;
+                b.angle = 0;
+                b.cooldown = 0;
+            }
+            return;
+        }
+        b.life -= dt;
+        b.age += dt;
+        stepRoll(b, dt, b.arena ?? this.arena);
+        if (b.rockHit) this.handleReflectorHit(b);
+        stepBallVault(this, b, dt);
+        if (deferProjectiles) previousRecord.end = { x: b.x, y: b.y, z: b.z, vault: !!b.vault };
+        if (b.wallHit) {
+            this.stats.wallBounces++;
+            this.lastWallBounce = {
+                x: b.x,
+                y: b.y,
+                vx: b.vx,
+                vy: b.vy,
+                time: this.time,
+                sides: [...b.wallHitSides],
+                ballId: b.id,
+            };
+            this.fx('hit', b.x, b.y, 0, 12);
+        }
+        afterMotion?.(b);
+        if (this.checkPickup(b, previous, bossPrevious)) return;
+        if (
+            !b.vault &&
+            (b.life <= 0 || (Math.hypot(b.vx, b.vy) < ROLL_SETTLE_SPEED && !trySecondRoll(this, b)))
+        ) {
+            this.retire(b);
+            return;
+        }
+        if (b.age - (b.lastTrail || -1) > 0.035) {
+            b.trail.push(b.vault ? { x: b.x, y: b.y, z: b.z } : { x: b.x, y: b.y });
+            b.lastTrail = b.age;
+            if (b.trail.length > 9) b.trail.shift();
+        }
+    }
     tick(dt) {
         if (this.phase !== 'playing') return;
         if (this.combatClock) advanceCombatClock(this.combatClock, dt, this.realTimeScale ?? 1);
@@ -815,14 +881,7 @@ export class BowlingGame {
                 recalling: b.recalling,
             }));
         const deferProjectiles = this.augments?.includes('break-bullet');
-        if (this.dashCharges < this.dashCapacity) {
-            this.dashRechargeRemaining -= dt * (this.realTimeScale ?? 1);
-            while (this.dashRechargeRemaining <= 1e-10 && this.dashCharges < this.dashCapacity) {
-                this.dashCharges++;
-                this.dashRechargeRemaining =
-                    this.dashCharges === this.dashCapacity ? 0 : this.dashRechargeRemaining + 0.5;
-            }
-        }
+        this.advanceDashCharge(dt);
         this.time += dt;
         this.remaining = Math.max(0, this.duration - this.time);
         this.shake = Math.max(0, this.shake - dt * 12);
@@ -869,61 +928,8 @@ export class BowlingGame {
                 this.fx('land', boss.x, boss.y, 0, 70, '#beca9a');
             }
         }
-        for (const b of this.balls) {
-            if (b.ready) continue;
-            const previous = ballPrevious[b.id].inWorld
-                ? ballPrevious[b.id]
-                : { x: b.x, y: b.y, z: b.z };
-            if (b.life <= 0) {
-                if (this.checkPickup(b, previous, bossPrevious)) continue;
-                b.cooldown -= dt;
-                if (b.cooldown <= 0) {
-                    b.ready = true;
-                    b.inWorld = false;
-                    b.pickupArmed = false;
-                    b.z = 0;
-                    b.x = b.homeX;
-                    b.y = b.homeY;
-                    b.angle = 0;
-                    b.cooldown = 0;
-                }
-                continue;
-            }
-            b.life -= dt;
-            b.age += dt;
-            stepRoll(b, dt, b.arena ?? this.arena);
-            if (b.rockHit) this.handleReflectorHit(b);
-            stepBallVault(this, b, dt);
-            if (deferProjectiles)
-                ballPrevious[b.id].end = { x: b.x, y: b.y, z: b.z, vault: !!b.vault };
-            if (b.wallHit) {
-                this.stats.wallBounces++;
-                this.lastWallBounce = {
-                    x: b.x,
-                    y: b.y,
-                    vx: b.vx,
-                    vy: b.vy,
-                    time: this.time,
-                    sides: [...b.wallHitSides],
-                    ballId: b.id,
-                };
-                this.fx('hit', b.x, b.y, 0, 12);
-            }
-            if (this.checkPickup(b, previous, bossPrevious)) continue;
-            if (
-                !b.vault &&
-                (b.life <= 0 ||
-                    (Math.hypot(b.vx, b.vy) < ROLL_SETTLE_SPEED && !trySecondRoll(this, b)))
-            ) {
-                this.retire(b);
-                continue;
-            }
-            if (b.age - (b.lastTrail || -1) > 0.035) {
-                b.trail.push(b.vault ? { x: b.x, y: b.y, z: b.z } : { x: b.x, y: b.y });
-                b.lastTrail = b.age;
-                if (b.trail.length > 9) b.trail.shift();
-            }
-        }
+        for (const b of this.balls)
+            this.advanceBall(b, dt, ballPrevious[b.id], bossPrevious, deferProjectiles);
         stepBallCaroms(this, ballPrevious);
         if (deferProjectiles) stepEnemyProjectiles(this, dt, bossPrevious, ballPrevious);
         stepPinMagnets(this, dt);

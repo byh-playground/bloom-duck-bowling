@@ -61,6 +61,9 @@ try {
     home.hidden = false;
 
     if (!showcaseDemo) {
+        void import('./duel-ui.mjs')
+            .then(({ installDuelUI }) => installDuelUI())
+            .catch((error) => console.warn('Duck Bowling duel could not load', error));
         void import('./home-motion.mjs')
             .then(({ installHomeMotion }) => installHomeMotion(home))
             .catch((error) => console.warn('Duck Bowling title showcase could not load', error));
