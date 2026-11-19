@@ -1,5 +1,6 @@
 import { BallBag } from './ball-bag.mjs';
 import { PIN_LAUNCH_KICK } from './ball-vault.mjs';
+import { advanceDashPose } from './bowler.mjs';
 import { DUCK_COMBAT, combatClock } from './combat-clock.mjs';
 import { createDuelPinState, hurtDuelPin, stepDuelPins } from './duel-pins.mjs';
 import { duckDashOpen, startDuckRecoil, stepDuckRecoil } from './duck-recoil.mjs';
@@ -101,6 +102,7 @@ class DuelPlayer extends BowlingGame {
     }
     advanceDuck(dt) {
         this.advanceDashCharge(dt);
+        advanceDashPose(this.boss, dt);
         this.time = this.match.time;
         this.boss.flash = Math.max(0, this.boss.flash - dt);
         this.boss.hurtAge = (this.boss.hurtAge ?? 99) + dt;

@@ -7,6 +7,7 @@ import {
     unlockedRoute,
 } from './arena.mjs';
 import { BowlingGame } from './sim.mjs';
+import { advanceDashPose, DASH_POSE_SECONDS } from './bowler.mjs';
 import { manualBounds } from './locomotion.mjs';
 import {
     createExpedition,
@@ -508,8 +509,7 @@ export class CampaignGame extends BowlingGame {
         }
         this.pinRacks = this.pinRacks.filter((rack) => rack.active);
         const dashSegment = this.boss.dashRemaining > 0 ? { x: this.boss.x, y: this.boss.y } : null;
-        if (Number.isFinite(this.boss.dashPose))
-            this.boss.dashPose = Math.min(0.33, this.boss.dashPose + dt);
+        advanceDashPose(this.boss, dt);
         super.tick(dt);
         if (this.phase === 'lost') return;
         afterBattleStep(this, dt, dashSegment);
@@ -659,7 +659,7 @@ export class CampaignGame extends BowlingGame {
                     timeMs: u.pinBlast.timeMs,
                 })),
             dashOnly: this.dashOnly,
-            dashPose: this.boss.dashPose ?? 0.33,
+            dashPose: this.boss.dashPose ?? DASH_POSE_SECONDS,
             vaultStarts: this.vaultStarts,
             secondRollStarts: this.secondRollStarts,
             activeVaults: this.balls.flatMap((b) =>

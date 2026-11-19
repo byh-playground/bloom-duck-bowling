@@ -21,7 +21,13 @@ export function renderDuel(context, game, side, aim = null) {
             enemies: game.pins,
             enemyProjectiles: game.projectiles,
             effects: game.effects,
-            duel: { players: game.players, side, teams: DUEL_TEAMS, centerLane: game.centerLane },
+            duel: {
+                players: game.players,
+                side,
+                teams: DUEL_TEAMS,
+                centerLane: game.centerLane,
+                ended: game.result !== null,
+            },
         },
         aim,
     );
