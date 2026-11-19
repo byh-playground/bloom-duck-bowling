@@ -306,6 +306,28 @@
     font-weight: 800;
 }
 
+.map-bowler {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: var(--duck-ink);
+    font-size: 14px;
+    font-weight: 750;
+}
+
+.map-bowler select {
+    min-height: 44px;
+    max-width: 65%;
+    flex: 1;
+    border: 1px solid var(--duck-border);
+    border-radius: 9px;
+    padding-inline: 10px;
+    background: var(--duck-button);
+    color: inherit;
+    font: inherit;
+}
+
 .map-cards {
     display: grid;
     gap: clamp(8px, 1.6dvh, 13px);
@@ -318,21 +340,13 @@
     align-items: stretch;
     width: 100%;
     min-height: clamp(110px, 22dvh, 164px);
-    border: 1px solid var(--duck-rail);
+    border: 1px solid var(--map-badge-line, var(--duck-rail));
     border-radius: 12px;
     padding: 4px;
     background: var(--duck-panel);
     color: var(--duck-ink);
     text-align: left;
     line-height: 1.24;
-}
-
-.map-card--storm {
-    --map-image-background: #243746;
-    --map-badge-background: #d3dee3;
-    --map-badge-ink: #304b5b;
-    --map-badge-line: #a1b4bd;
-    border-color: #a1b4bd;
 }
 
 .map-card.locked {

@@ -2,6 +2,7 @@ import { arenaForRoute, rackEntrance, routeDefinition } from '../domain/arena.mj
 import { BALL_TYPES, predictRoll, prepareRoll, rollBounds } from '../domain/dynamics.mjs';
 import { shieldGuardUp } from '../domain/enemies.mjs';
 import { bowlerPose, bowlerRecoilPoint, FOLLOW_TIME, releasePoint } from '../domain/bowler.mjs';
+import { bowlerDefinition } from '../domain/bowlers.mjs';
 // Original read-only 2.5D canvas renderer. No random draws or simulation mutation.
 import { CAMERA, CAMERA_VIEW, project, cameraDepth, worldVectorToScreen } from './camera.mjs';
 import {
@@ -483,7 +484,7 @@ function enemy(c, e) {
         );
     }
 }
-function orb(c, x, y, z, rx, ry, rz, color, shade, tilt = 0) {
+function orb(c, { x, y, z }, rx, ry, rz, part, surface, tilt, hit) {
     const p = project(x, y, z),
         w = rx * CAMERA.scale,
         h = Math.hypot(ry * Math.sin(CAMERA.pitch), rz * Math.cos(CAMERA.pitch)) * CAMERA.scale;
@@ -494,12 +495,14 @@ function orb(c, x, y, z, rx, ry, rz, color, shade, tilt = 0) {
         p.x = 0;
         p.y = 0;
     }
-    ellipse(c, p.x, p.y, w, h, shade || color, '#344f40', 2);
-    ellipse(c, p.x - w * 0.12, p.y - h * 0.14, w * 0.88, h * 0.84, color);
-    ellipse(c, p.x - w * 0.33, p.y - h * 0.48, w * 0.28, h * 0.13, '#fff5d944');
+    ellipse(c, p.x, p.y, w, h, part.shade, surface.outline, 2);
+    const fill = hit ? (part.hit ?? part.fill) : part.fill;
+    ellipse(c, p.x - w * 0.12, p.y - h * 0.14, w * 0.88, h * 0.84, fill);
+    ellipse(c, p.x - w * 0.33, p.y - h * 0.48, w * 0.28, h * 0.13, surface.highlight);
     if (tilt) c.restore();
 }
 function boss(c, b, held = null) {
+    const { palette, radius, draw } = bowlerDefinition(b.bowlerId);
     const pose = bowlerPose(b),
         face = pose.face,
         dx = Math.cos(face),
@@ -514,6 +517,26 @@ function boss(c, b, held = null) {
             y: b.y + dy * (forward + drive * z * 0.25) + dx * side,
             z: z * (1 - drive * 0.28),
         });
+    const flashing = b.flash > 0;
+    if (draw) {
+        c.save();
+        try {
+            draw({
+                context: c,
+                pose,
+                palette,
+                project: q,
+                point,
+                radius,
+                flashing,
+                drawHeldBall: held ? () => ball(c, held) : null,
+            });
+        } finally {
+            c.restore();
+        }
+        return;
+    }
+
     let tilt = 0;
     if (pose.phase === 'recoil') {
         const bottom = q(point(0, 0, 0)),
@@ -526,77 +549,44 @@ function boss(c, b, held = null) {
         parts = [];
     const bodyShell = pose.phase === 'recoil' ? point(0, 0, 58) : { ...body, z: body.z + 6 };
     const add = (o, draw) => parts.push({ depth: cameraDepth(o.x, o.y, o.z), draw });
+    const paintOrb = (o, width, depth, height, colors) =>
+        orb(c, o, width, depth, height, colors, palette.surface, tilt, flashing);
     for (const foot of [pose.backFoot, pose.leadFoot])
-        add(foot, () => orb(c, foot.x, foot.y, foot.z, 19, 27, 7, '#c99748', '#8b713e', tilt));
+        add(foot, () => paintOrb(foot, 19, 27, 7, palette.feet));
     add(other, () => {
         const p = q(other),
             a = q(body);
-        line(c, [a, p], '#405c42', 22);
-        line(c, [a, p], '#c3924f', 16);
+        line(c, [a, p], palette.farArm.outline, 22);
+        line(c, [a, p], palette.farArm.fill, 16);
     });
     add(bodyShell, () =>
-        orb(
-            c,
-            bodyShell.x,
-            bodyShell.y,
-            bodyShell.z,
-            55 + 5 * drive,
-            46 + 8 * drive,
-            62 - 15 * drive,
-            b.flash > 0 ? '#efaa86' : '#e0ac56',
-            '#a98146',
-            tilt,
-        ),
+        paintOrb(bodyShell, 55 + 5 * drive, 46 + 8 * drive, 62 - 15 * drive, palette.body),
     );
     const belly = point(0, 31, 58);
-    add(belly, () =>
-        orb(
-            c,
-            belly.x,
-            belly.y,
-            belly.z,
-            40,
-            18 + 4 * drive,
-            44 - 10 * drive,
-            '#f6d58a',
-            '#d0ad66',
-            tilt,
-        ),
-    );
+    add(belly, () => paintOrb(belly, 40, 18 + 4 * drive, 44 - 10 * drive, palette.belly));
     add(head, () => {
-        orb(
-            c,
-            head.x,
-            head.y,
-            head.z,
-            32,
-            31,
-            34 - 6 * drive,
-            b.flash > 0 ? '#ffd0a7' : '#edc270',
-            '#bd9553',
-            tilt,
-        );
+        paintOrb(head, 32, 31, 34 - 6 * drive, palette.head);
         for (const side of [-1, 1]) {
             if (-dx * Math.sin(CAMERA.yaw) + dy * Math.cos(CAMERA.yaw) < -0.15) continue;
             const e = point(side * 14, 35 + pose.lean * 12, 120),
                 p = q(e);
-            ellipse(c, p.x, p.y, 3.2, 5, '#2e493b');
-            ellipse(c, p.x - 1, p.y - 2, 1, 1.5, '#fff6cf');
+            ellipse(c, p.x, p.y, 3.2, 5, palette.eyes.pupil);
+            ellipse(c, p.x - 1, p.y - 2, 1, 1.5, palette.eyes.shine);
         }
         const crown = [point(-16, 8, 141), point(0, 4, 153), point(16, 8, 142)].map(q);
-        line(c, crown, '#5d8051', 7);
+        line(c, crown, palette.crown.fill, 7);
     });
-    add(beak, () => orb(c, beak.x, beak.y, beak.z, 20, 19, 8, '#dc9443', '#a37535', tilt));
+    add(beak, () => paintOrb(beak, 20, 19, 8, palette.beak));
     const arm = [q(pose.shoulder), q(pose.elbow), q(pose.hand)];
     add(pose.elbow, () => {
-        line(c, arm, '#3f5c42', 21);
-        line(c, arm, '#d8a457', 15);
+        line(c, arm, palette.throwArm.outline, 21);
+        line(c, arm, palette.throwArm.fill, 15);
         const e = q(pose.elbow);
-        ellipse(c, e.x, e.y, 8, 8, '#e8b96b');
+        ellipse(c, e.x, e.y, 8, 8, palette.throwArm.elbow);
     });
     add(pose.hand, () => {
         const h = q(pose.hand);
-        ellipse(c, h.x, h.y, 11, 9, '#f3ce85', '#3f5b40', 1.5);
+        ellipse(c, h.x, h.y, 11, 9, palette.hand.fill, palette.hand.outline, 1.5);
     });
     if (held) add({ x: held.x, y: held.y, z: (held.z || 0) + held.r }, () => ball(c, held));
     parts.sort((a, b) => a.depth - b.depth);

@@ -1,3 +1,5 @@
+import { mapUnlocksForStage, MAX_RECORD_STAGE } from '../domain/arena.mjs';
+
 // Only this game's versioned record is touched. Unlocks add choices, never permanent power.
 export const PROFILE_KEY = 'physics-boss-lab:bowling:profile:v1';
 export function defaultProfile() {
@@ -8,10 +10,10 @@ function validated(value) {
     if (!value || typeof value !== 'object' || value.version !== 1) return defaultProfile();
     const runs = integer(value.runs),
         wins = Math.min(runs, integer(value.wins)),
-        bestStage = integer(value.bestStage, 8);
+        bestStage = integer(value.bestStage, MAX_RECORD_STAGE);
     const unlocks = [];
     if (bestStage >= 3) unlocks.push('spinner');
-    if (bestStage >= 5) unlocks.push('storm');
+    unlocks.push(...mapUnlocksForStage(bestStage));
     return { version: 1, runs, wins, bestStage, unlocks };
 }
 export function loadProfile(storage) {
@@ -30,14 +32,17 @@ export function saveProfile(storage, profile) {
         return false;
     }
 }
-// `stage` is the highest reached room (1..8), including the room in which a run ended.
+// `stage` is the highest reached room, including the room in which a run ended.
 export function recordRun(profile, { stage = 0, won = false, total = 8 } = {}) {
     const p = validated(profile);
     return validated({
         ...p,
         runs: Math.min(1000000, p.runs + 1),
         wins: p.wins + (won === true ? 1 : 0),
-        bestStage: Math.max(p.bestStage, won === true ? integer(total, 8) : integer(stage, 8)),
+        bestStage: Math.max(
+            p.bestStage,
+            won === true ? integer(total, MAX_RECORD_STAGE) : integer(stage, MAX_RECORD_STAGE),
+        ),
     });
 }
 export function resetProfile(storage) {
