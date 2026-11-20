@@ -422,8 +422,9 @@ export class DuelGame {
             Array.isArray(state.pinState?.targets) &&
             state.pinState.targets.length === 2 &&
             state.pinState.targets.every((target) => Number.isFinite(target?.clock?.nowMs)) &&
-            Number.isSafeInteger(state.pinState.awarded) &&
-            state.pinState.awarded >= 0 &&
+            Array.isArray(state.pinState.awarded) &&
+            state.pinState.awarded.length === 2 &&
+            state.pinState.awarded.every((value) => Number.isSafeInteger(value) && value >= 0) &&
             Number.isSafeInteger(state.pinState.rng) &&
             Number.isSafeInteger(state.pinState.nextWaveAtMs) &&
             Array.isArray(state.impactPairs) &&

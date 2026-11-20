@@ -1,8 +1,8 @@
 import { advanceCombatClock, combatClock } from './combat-clock.mjs';
 import { BODY_GRAVITY } from './duck-recoil.mjs';
+import { planDuelSpawn } from './duel-spawn.mjs';
 import { ENEMY_TYPES, configureEnemy, flagSupport, ignite, specialDrive } from './enemies.mjs';
 import { stepPinBlast } from './pin-blast.mjs';
-import { LARGE_PIN_FORMATION, PIN_DEPTH, PIN_GAP, pinSlots } from './pin-formation.mjs';
 import { stepEnemyProjectiles, stepPinProjectileThreat } from './pin-projectiles.mjs';
 import { nextRandom } from './random.mjs';
 import { resolveReflectors } from './terrain.mjs';
@@ -10,7 +10,6 @@ import { resolveReflectors } from './terrain.mjs';
 export const DUEL_WAVE_MS = 4000;
 export const DUEL_SPECIAL_KILLS = 6;
 const PIN_APPROACH_SPEED = 43;
-const SPAWN_INSET = 325;
 const PIN_LIFETIME_MS = DUEL_WAVE_MS * 6;
 const FIGHT_REACH = 10;
 const BODY_DRAG = 3;
@@ -38,7 +37,7 @@ export function createDuelPinState(seed) {
     return {
         targets: [createTarget(), createTarget()],
         rng: (seed ^ 0x517cc1b7) >>> 0,
-        awarded: 0,
+        awarded: [0, 0],
         nextWaveAtMs: 0,
         waves: 0,
         nextPinId: 1,
@@ -59,15 +58,13 @@ function drawSpecial(state) {
 }
 
 function makePin(game, kind, x, y, facing) {
-    const r = ENEMY_TYPES[kind].r;
-    const a = game.arena;
     const u = configureEnemy(
         {
             id: game.pinState.nextPinId++,
             targetSide: null,
-            expiresAtMs: game.pinState.nextWaveAtMs + PIN_LIFETIME_MS,
-            x: clamp(x, a.left + r, a.right - r),
-            y: clamp(y, a.top + r, a.bottom - r),
+            expiresAtMs: game.clock.nowMs + PIN_LIFETIME_MS,
+            x,
+            y,
             z: 0,
             vx: 0,
             vy: 0,
@@ -93,40 +90,23 @@ function makePin(game, kind, x, y, facing) {
 
 function spawnWave(game) {
     const state = game.pinState;
-    const specials = [[drawSpecial(state)], [drawSpecial(state)]];
-    const totalScore = game.players[0].score + game.players[1].score;
-    const earned = Math.floor(totalScore / DUEL_SPECIAL_KILLS);
-    while (state.awarded < earned) {
-        specials[state.awarded % 2].push(drawSpecial(state));
-        state.awarded++;
-    }
-    const a = game.arena;
-    const x = a.centerX ?? (a.left + a.right) / 2;
-    for (let side = 0; side < game.players.length; side++) {
-        const sign = side === 0 ? -1 : 1;
-        const y = side === 0 ? a.bottom - SPAWN_INSET : a.top + SPAWN_INSET;
-        const facing = (sign * Math.PI) / 2;
-        for (const slot of pinSlots(LARGE_PIN_FORMATION, { x, y, nx: 0, ny: sign })) {
-            makePin(game, 'grunt', slot.x, slot.y, facing);
-        }
-        const flankPins = specials[side];
-        const specialSpacing = ENEMY_TYPES.giant.r * 2 + FIGHT_REACH;
-        for (let i = 0; i < flankPins.length; i++) {
-            const flank = i % 2 ? 1 : -1;
-            const lane = Math.floor(i / 2) % 2;
-            const rank = Math.floor(i / 4);
-            const offset = PIN_GAP + specialSpacing * (1 + lane);
-            makePin(
-                game,
-                flankPins[i],
-                x + flank * offset,
-                y - sign * PIN_DEPTH + sign * rank * specialSpacing,
-                facing,
-            );
+    const draw = { rng: state.rng };
+    const specials = [[drawSpecial(draw)], [drawSpecial(draw)]];
+    const earned = game.players.map(({ score }) => Math.floor(score / DUEL_SPECIAL_KILLS));
+    for (const { side } of game.players) {
+        for (let i = state.awarded[side]; i < earned[side]; i++) {
+            specials[1 - side].push(drawSpecial(draw));
         }
     }
-    game.pinState.waves++;
-    game.pinState.nextWaveAtMs += DUEL_WAVE_MS;
+    const rosters = specials.map((kinds, side) => planDuelSpawn(game, side, kinds));
+    if (rosters.some((roster) => !roster)) return;
+    for (const roster of rosters) {
+        for (const { kind, x, y, facing } of roster) makePin(game, kind, x, y, facing);
+    }
+    state.rng = draw.rng;
+    state.awarded = earned;
+    state.waves++;
+    state.nextWaveAtMs = game.clock.nowMs + DUEL_WAVE_MS;
 }
 
 export function hurtDuelPin(
