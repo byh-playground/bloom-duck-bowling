@@ -11,12 +11,11 @@ const GRUNT_RADIUS = ENEMY_TYPES.grunt.r;
 const distanceSquared = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 
 export function planDuelSpawn(game, side, specials) {
-    const { arena } = game;
-    const top = side === 0 ? game.centerLane.y + game.centerLane.halfWidth : arena.top;
-    const bottom = side === 0 ? arena.bottom : game.centerLane.y - game.centerLane.halfWidth;
-    const sign = side === 0 ? -1 : 1;
-    const facing = (sign * Math.PI) / 2;
-    const originY = (side === 0 ? bottom : top) + sign * SPAWN_INSET;
+    const arena = game.courts[side];
+    const { top, bottom } = arena;
+    const { boss } = game.players[side];
+    const facing = Math.PI / 2;
+    const originY = top + SPAWN_INSET;
     const rocks = arena.reflectors.filter(reflectorIsActive);
     const safe = (point) => {
         const { r, x, y } = point;
@@ -26,23 +25,21 @@ export function planDuelSpawn(game, side, specials) {
             x + r <= arena.right &&
             y - r >= top &&
             y + r <= bottom &&
-            game.players.every(({ boss }) => distanceSquared(boss, point) >= radius ** 2) &&
+            distanceSquared(boss, point) >= radius ** 2 &&
             rocks.every((rock) => !reflectorOverlaps(point, rock))
         );
     };
 
     for (const depth of OFFSETS) {
         for (const across of OFFSETS) {
-            const x = arena.centerX + across * PIN_GAP * sign;
-            const y = originY + depth * PIN_DEPTH * sign;
-            const grunts = pinSlots(LARGE_PIN_FORMATION, { x, y, nx: 0, ny: sign }).map(
-                (point) => ({
-                    ...point,
-                    kind: 'grunt',
-                    r: GRUNT_RADIUS,
-                    facing,
-                }),
-            );
+            const x = arena.centerX + across * PIN_GAP;
+            const y = originY + depth * PIN_DEPTH;
+            const grunts = pinSlots(LARGE_PIN_FORMATION, { x, y, nx: 0, ny: 1 }).map((point) => ({
+                ...point,
+                kind: 'grunt',
+                r: GRUNT_RADIUS,
+                facing,
+            }));
             if (!grunts.every(safe)) continue;
             const points = [];
             for (let row = top + PIN_GAP; row < bottom; row += PIN_GAP) {
@@ -50,7 +47,7 @@ export function planDuelSpawn(game, side, specials) {
                     points.push({ x: col, y: row });
                 }
             }
-            const flank = { x, y: y - sign * PIN_DEPTH };
+            const flank = { x, y: y - PIN_DEPTH };
             points.sort((a, b) => distanceSquared(a, flank) - distanceSquared(b, flank));
             const roster = [...grunts];
             for (const kind of specials) {

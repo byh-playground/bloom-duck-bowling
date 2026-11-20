@@ -4,35 +4,31 @@ export const DUEL_TEAMS = Object.freeze({
     local: Object.freeze({ ink: '#07544a', light: '#66f2c6' }),
     opponent: Object.freeze({ ink: '#7d331a', light: '#ff904b' }),
 });
-const teamsBySide = [
-    [DUEL_TEAMS.local, DUEL_TEAMS.opponent],
-    [DUEL_TEAMS.opponent, DUEL_TEAMS.local],
-];
-
-// A read-only presentation view. Local ammo, aim and recovery remain owner-specific.
-export function renderDuel(context, game, side, aim = null) {
-    const local = game.players[side];
+// Both courts have their own actors at the same local world coordinates.
+export function renderDuel(context, game, viewerSide, aim = null, courtSide = viewerSide) {
+    const player = game.players[courtSide];
+    const isLocal = courtSide === viewerSide;
+    const onCourt = (entity) => entity.court === courtSide;
     render(
         context,
         {
-            arena: game.arena,
+            arena: game.courts[courtSide],
             time: game.time,
             route: game.route,
             controlMode: 'manual',
-            boss: local.boss,
-            balls: local.balls,
-            selectedType: local.selectedType,
-            enemies: game.pins,
-            enemyProjectiles: game.projectiles,
-            effects: game.effects,
+            boss: player.boss,
+            balls: player.balls,
+            selectedType: player.selectedType,
+            enemies: game.pins.filter(onCourt),
+            enemyProjectiles: game.projectiles.filter(onCourt),
+            effects: game.effects.filter(onCourt),
             duel: {
-                players: game.players,
-                side,
-                teams: teamsBySide[side],
-                centerLane: game.centerLane,
+                label: isLocal ? '나' : '상대',
+                team: isLocal ? DUEL_TEAMS.local : DUEL_TEAMS.opponent,
+                senderTeam: isLocal ? DUEL_TEAMS.opponent : DUEL_TEAMS.local,
                 ended: game.result !== null,
             },
         },
-        aim,
+        isLocal ? aim : null,
     );
 }

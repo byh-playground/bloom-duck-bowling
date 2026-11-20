@@ -107,6 +107,26 @@ function blastPuff(c, e) {
     }
     c.restore();
 }
+function specialDrop(c, e, team) {
+    const t = clamp(e.age / e.life, 0, 1);
+    if (t >= 1) return;
+    const ground = project(e.x, e.y);
+    const radius = clamp(e.size * CAMERA.scale, 17, 34) * (1 + t * 0.85);
+    const depth = radius * Math.sin(CAMERA.pitch);
+    const chevron = project(e.x, e.y, 82 - 40 * t);
+    const points = [
+        { x: chevron.x - 10, y: chevron.y - 5 },
+        { x: chevron.x, y: chevron.y + 5 },
+        { x: chevron.x + 10, y: chevron.y - 5 },
+    ];
+    c.save();
+    c.globalAlpha = (1 - t) * 0.92;
+    ellipse(c, ground.x, ground.y, radius, depth, 'transparent', team.ink, 6);
+    ellipse(c, ground.x, ground.y, radius, depth, 'transparent', team.light, 3);
+    line(c, points, team.ink, 7);
+    line(c, points, team.light, 4);
+    c.restore();
+}
 function enemyGround(c, e, boss) {
     const p = project(e.x, e.y),
         grounded = (e.z || 0) < 8;
@@ -1126,25 +1146,6 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
             { storm, time: g.time, view },
         );
     } else field(c, g.route, arena, g.time, g.duel);
-    if (g.duel) {
-        const { y, halfWidth } = g.duel.centerLane;
-        const { left, right } = arena;
-        const top = y - halfWidth;
-        const bottom = y + halfWidth;
-        polygon(
-            c,
-            [
-                project(left, top),
-                project(right, top),
-                project(right, bottom),
-                project(left, bottom),
-            ],
-            '#bdd8df30',
-        );
-        for (const edge of [top, bottom]) {
-            line(c, [project(left, edge), project(right, edge)], '#c4dce6c0', 2, [7, 8]);
-        }
-    }
     // Ready balls count as supply; echoes do not. Armed loose balls stay collectible while rolling or before auto-return.
     const bounds = exp?.room?.arena;
     const seen = (o) =>
@@ -1152,12 +1153,10 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
         (o.x >= bounds.left && o.x <= bounds.right && o.y >= bounds.top && o.y <= bounds.bottom);
     const balls = g.balls || [],
         lowAmmo = balls.filter((b) => b.ready).length <= 1;
-    const bowlers = g.duel?.players;
-    const allBalls = bowlers?.flatMap((player) => player.balls) ?? balls;
-    const teamOf = (o) => g.duel?.teams[o.side];
+    const team = g.duel?.team;
     const enemies = (g.enemies || []).filter(seen);
     const liveBalls = [
-        ...allBalls.filter(
+        ...balls.filter(
             (b) => (b.ready && b.held) || (!b.ready && (b.life > 0 || b.inWorld) && seen(b)),
         ),
         ...(g.echoes || []).filter(seen),
@@ -1170,39 +1169,32 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
                 line(
                     c,
                     b.trail.filter(seen).map((p) => project(p.x, p.y, p.z || 0)),
-                    teamOf(b)?.light ?? '#fff0b1',
+                    team?.light ?? '#fff0b1',
                     b.r * 0.8,
                 );
                 c.restore();
             }
         }
-        if (g.controlMode === 'manual') {
-            if (bowlers) for (const player of bowlers) bowlerTrail(c, player.boss);
-            else bowlerTrail(c, g.boss);
-        }
+        if (g.controlMode === 'manual') bowlerTrail(c, g.boss);
     }
     const liveShots = (g.enemyProjectiles || []).filter(seen);
     for (const magnet of (g.pinMagnets || []).filter(seen)) magnetGround(c, magnet, g.time || 0);
     for (const e of enemies) enemyGround(c, e, g.boss);
     for (const s of liveShots) enemyShotGround(c, s, threatInk);
     for (const e of enemies) if (drawEnemy(e)) shadow(c, e, e.r * 1.05);
-    if (bowlers) {
-        for (const player of bowlers) {
-            const b = player.boss;
-            shadow(c, b, b.r * 0.94);
-            const p = project(b.x, b.y);
-            const r = b.r * CAMERA.scale * 0.84;
-            const team = teamOf(b);
-            ellipse(c, p.x, p.y, r, r * Math.sin(CAMERA.pitch), team.ink + '22', team.ink, 4);
-            ellipse(c, p.x, p.y, r, r * Math.sin(CAMERA.pitch), team.ink + '00', team.light, 1.55);
-        }
-    } else shadow(c, g.boss, g.boss.r * 0.94);
+    shadow(c, g.boss, g.boss.r * 0.94);
+    if (team) {
+        const p = project(g.boss.x, g.boss.y);
+        const r = g.boss.r * CAMERA.scale * 0.84;
+        ellipse(c, p.x, p.y, r, r * Math.sin(CAMERA.pitch), team.ink + '22', team.ink, 4);
+        ellipse(c, p.x, p.y, r, r * Math.sin(CAMERA.pitch), 'transparent', team.light, 1.55);
+    }
     for (const b of liveBalls) {
         if (b.vault && b.vault.kind !== 'second-roll' && b.z > 0) ballVaultShadow(c, b);
         else shadow(c, b, b.r * 0.9);
     }
     const objects = [
-        ...(bowlers ?? [{ boss: g.boss }]).map(({ boss }) => ({ o: boss, type: 'boss' })),
+        { o: g.boss, type: 'boss' },
         ...(arena.reflectors ?? [])
             .filter(reflectorIsActive)
             .map((o) => ({ o, type: 'reflector' })),
@@ -1211,28 +1203,26 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
         ...liveShots.map((o) => ({ o, type: 'projectile' })),
     ].sort((a, b) => drawDepth(a.o, a.type) - drawDepth(b.o, b.type));
     for (const { o, type } of objects) {
-        if (type === 'boss') {
+        if (type === 'boss')
             boss(
                 c,
                 o,
-                liveBalls.find((b) => b.held && (!bowlers || b.side === o.side)),
-                teamOf(o),
+                liveBalls.find((b) => b.held),
+                team,
             );
-        } else if (type === 'reflector') drawReflector(c, o, { polygon, line });
+        else if (type === 'reflector') drawReflector(c, o, { polygon, line });
         else if (type === 'enemy') enemy(c, o);
         else if (type === 'projectile') enemyShot(c, o, threatInk);
-        else ball(c, o, teamOf(o));
+        else ball(c, o, team);
     }
-    if (bowlers) {
-        for (const player of bowlers) {
-            const b = player.boss;
-            const at = project(b.x, b.y, Math.max(0, (b.recoil?.z ?? 0) - 7));
-            const text = b.side === g.duel.side ? '나' : '상대';
-            c.save();
-            ellipse(c, at.x, at.y + 15, text === '나' ? 13 : 20, 9, teamOf(b).ink);
-            label(c, text, at.x, at.y + 15, 12, '#fff9eb');
-            c.restore();
-        }
+    if (team) {
+        const { x, y, recoil } = g.boss;
+        const at = project(x, y, Math.max(0, (recoil?.z ?? 0) - 7));
+        const text = g.duel.label;
+        c.save();
+        ellipse(c, at.x, at.y + 15, text === '나' ? 13 : 20, 9, team.ink);
+        label(c, text, at.x, at.y + 15, 12, '#fff9eb');
+        c.restore();
     }
     // Cutaway preserves enemy visibility; loose balls only get the low-ammo recovery cue.
     const bp = project(g.boss.x, g.boss.y, 68 + (g.boss.recoil?.z || 0)),
@@ -1279,8 +1269,8 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
             4,
         );
     const hp = clamp(g.boss.hp / Math.max(1, g.boss.maxHp), 0, 1);
-    for (const { boss: b } of bowlers ?? [{ boss: g.boss }]) {
-        if (!b.lastDamage || (b.hurtAge ?? 99) >= 0.8) continue;
+    const b = g.boss;
+    if (b.lastDamage && (b.hurtAge ?? 99) < 0.8) {
         const hpPoint = project(b.x, b.y, 170 + (b.recoil?.z || 0));
         const age = b.hurtAge || 0;
         c.save();
@@ -1304,6 +1294,10 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
         c.restore();
     }
     for (const e of (g.effects || []).filter(seen)) {
+        if (e.kind === 'special-drop' && g.duel) {
+            specialDrop(c, e, g.duel.senderTeam);
+            continue;
+        }
         if (e.kind === 'rock-break') {
             drawReflectorBreak(c, e, { polygon });
             continue;
@@ -1352,8 +1346,7 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
         c.globalAlpha =
             e.kind === 'stomp' && e.color !== '#ffae6f' && e.color !== '#e9a06b' ? t * 0.22 : t;
         if (e.kind === 'pickup') {
-            const pickupOwner = bowlers?.[e.side]?.boss ?? g.boss;
-            const q = project(pickupOwner.x, pickupOwner.y, 80),
+            const q = project(g.boss.x, g.boss.y, 80),
                 travel = 1 - t;
             for (let i = 0; i < 4; i++) {
                 const a = (i * TAU) / 4,

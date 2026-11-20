@@ -15,17 +15,14 @@ import { PHYSICS_STEP_SECONDS, STEP_SECONDS } from './timing.mjs';
 const DUEL_ROUTE = 'storm';
 export const DUEL_SCORE_GOAL = 300;
 const START_INSET = 95;
-const CENTER_LANE_HALF_WIDTH = 40;
-const CONTACT_EPSILON = 1e-6;
 const PIN_CONTACT_RELEASE_MARGIN = 0.5;
-const DUCK_RESTITUTION = 0.48;
+const isCourt = (court) => court === 0 || court === 1;
 const pointOf = (body) => ({ x: body.x, y: body.y, z: body.recoil?.z ?? body.z ?? 0 });
 
 class DuelPlayer extends BowlingGame {
     constructor(match, seed, side) {
-        const { arena } = match;
-        const south = side === 0;
-        const y = south ? arena.bottom - START_INSET : arena.top + START_INSET;
+        const arena = match.courts[side];
+        const y = arena.bottom - START_INSET;
         super(seed, {
             autoWaves: false,
             arena,
@@ -41,28 +38,25 @@ class DuelPlayer extends BowlingGame {
         this.dashCapacity = 3;
         this.dashCharges = this.dashCapacity;
         this.duckBounds = manualBounds(arena);
-        const margin = match.centerLane.halfWidth + this.boss.r;
-        if (south) this.duckBounds.minY = match.centerLane.y + margin;
-        else this.duckBounds.maxY = match.centerLane.y - margin;
         this.combatClock = match.clock;
         this.boss.dashOnly = true;
         this.boss.side = side;
-        this.boss.facing = south ? -Math.PI / 2 : Math.PI / 2;
+        this.boss.facing = -Math.PI / 2;
         this.boss.hp = DUCK_COMBAT.maxHp;
         this.boss.maxHp = DUCK_COMBAT.maxHp;
-        this.lastMove = { x: 0, y: south ? -1 : 1 };
+        this.lastMove = { x: 0, y: -1 };
         for (const ball of this.balls) {
             ball.side = side;
             ball.homeX = arena.centerX;
             ball.x = ball.homeX;
-            ball.duckContact = false;
         }
         this.syncHand();
     }
     fx(...args) {
-        this.match.fx(...args);
+        this.match.fxOnCourt(this.side, ...args);
     }
     ballContact(ball, pin) {
+        if (pin.court !== this.side) return;
         if (ball.hitIds.has(pin.id)) {
             const dz =
                 ball.held || pin.projectileHop || ball.vault
@@ -88,10 +82,7 @@ class DuelPlayer extends BowlingGame {
         if (this.boss.hp <= 0) return;
         const ball = this.balls.find((candidate) => candidate.ready && candidate.held);
         const shot = action?.shot;
-        if (shot && ball && this.launch(ball.id, shot.vx, shot.vy, shot.spin)) {
-            ball.duckContact = false;
-            return;
-        }
+        if (shot && ball && this.launch(ball.id, shot.vx, shot.vy, shot.spin)) return;
         if (
             this.dashCharges > 0 &&
             (action?.dash || (!(this.boss.dashRemaining > 0) && !this.boss.delivery)) &&
@@ -108,8 +99,8 @@ class DuelPlayer extends BowlingGame {
         stepManual(this, dt);
         if (this.boss.recoil) stepDuckRecoil(this, dt);
     }
-    advanceDelivery(dt) {
-        this.enemies = this.match.pins;
+    advanceDelivery(dt, courtPins) {
+        this.enemies = courtPins;
         const before = this.stats.shots;
         this.updateBowler(dt);
         if (this.stats.shots !== before) {
@@ -187,6 +178,8 @@ function validPlayer(packed, side, player) {
         isPosition(packed?.boss) &&
         packed.boss.side === side &&
         packed.boss.r === player.boss.r &&
+        packed.boss.x >= player.duckBounds.minX &&
+        packed.boss.x <= player.duckBounds.maxX &&
         packed.boss.y >= player.duckBounds.minY &&
         packed.boss.y <= player.duckBounds.maxY &&
         packed.boss.hp === DUCK_COMBAT.maxHp &&
@@ -230,11 +223,10 @@ export class DuelGame {
     constructor(seed) {
         this.seed = seed >>> 0;
         this.route = DUEL_ROUTE;
-        this.arena = createExpedition(DUEL_ROUTE, this.seed).room.arena;
-        this.centerLane = Object.freeze({
-            y: this.arena.centerY,
-            halfWidth: CENTER_LANE_HALF_WIDTH,
-        });
+        this.courts = Array.from(
+            { length: 2 },
+            () => createExpedition(DUEL_ROUTE, this.seed).room.arena,
+        );
         this.clock = combatClock();
         this.tick = 0;
         this.result = null;
@@ -252,7 +244,7 @@ export class DuelGame {
             this.resolvePinImpact(a, b, impulse, side, depth);
     }
     resolvePinImpact(a, b, impulse, side, depth) {
-        if (side !== 0 && side !== 1) return;
+        if (!isCourt(side) || a.court !== side || b.court !== side) return;
         for (const pin of [a, b]) {
             if (pin.hp <= 0) continue;
             const kick = impulse / Math.max(1, pin.mass);
@@ -261,14 +253,24 @@ export class DuelGame {
                     ? Math.max(0, Math.min(250, 90 + kick * 0.24) - (pin.vz || 0))
                     : 0;
             this.hurtPin(pin, Math.min(35, impulse * 0.11), side, { stun: 0.28, depth, vz });
-            this.fx('hit', pin.x, pin.y, pin.z + 12, Math.min(38, 12 + impulse * 0.025));
+            this.fxOnCourt(
+                side,
+                'hit',
+                pin.x,
+                pin.y,
+                pin.z + 12,
+                Math.min(38, 12 + impulse * 0.025),
+            );
         }
     }
     get time() {
         return this.clock.nowMs / 1000;
     }
-    fx(...args) {
+    fxOnCourt(court, ...args) {
         BowlingGame.prototype.fx.call(this, ...args);
+        const effect = this.effects.at(-1);
+        effect.court = court;
+        if (effect.kind === 'special-drop') effect.life = 900 / 1000;
     }
     hurtPin(pin, amount, playerIndex, impact = {}) {
         return hurtDuelPin(this, pin, { damage: amount, playerIndex, ...impact });
@@ -277,64 +279,32 @@ export class DuelGame {
         const player = this.players[side];
         if (!player || !startDuckRecoil(player, impact)) return false;
         const duck = player.boss;
-        this.fx('hit', duck.x, duck.y, 20, duck.r * 0.5, '#d3e7d8');
+        this.fxOnCourt(side, 'hit', duck.x, duck.y, 20, duck.r * 0.5, '#d3e7d8');
         return true;
     }
-    restoreReflectors() {
+    restoreReflectors(side, pins) {
+        const { boss, balls } = this.players[side];
         const overlaps = (slot) =>
-            this.players.some(
-                ({ boss, balls }) =>
-                    reflectorOverlaps(boss, slot, boss.recoil?.z ?? 0) ||
-                    balls.some(
-                        (ball) =>
-                            (ball.inWorld || ball.held) && reflectorOverlaps(ball, slot, ball.z),
-                    ),
-            ) || this.pins.some((pin) => reflectorOverlaps(pin, slot, pin.z));
-        for (const rock of this.arena.reflectors) {
+            reflectorOverlaps(boss, slot, boss.recoil?.z ?? 0) ||
+            balls.some(
+                (ball) => (ball.inWorld || ball.held) && reflectorOverlaps(ball, slot, ball.z),
+            ) ||
+            pins.some((pin) => reflectorOverlaps(pin, slot, pin.z));
+        for (const rock of this.courts[side].reflectors) {
             if (restoreReflector(rock, this.clock.nowMs, overlaps)) {
-                this.fx('rock-return', rock.x, rock.y, 0, rock.width);
+                this.fxOnCourt(side, 'rock-return', rock.x, rock.y, 0, rock.width);
             }
         }
     }
-    contactDuck(ball, side, targetPrevious) {
-        const player = this.players[side];
-        const target = player.boss;
-        const dx = target.x - ball.x,
-            dy = target.y - ball.y;
-        const dz = (target.recoil?.z ?? 0) - (ball.z ?? 0);
-        const distance = Math.hypot(dx, dy, dz);
-        const radius = target.r + ball.r;
-        if (distance > radius + CONTACT_EPSILON) {
-            ball.duckContact = false;
-            return;
-        }
-        if (ball.duckContact) return;
-        const planar = Math.hypot(dx, dy);
-        const speed = Math.hypot(ball.vx, ball.vy);
-        const nx = planar > CONTACT_EPSILON ? dx / planar : ball.vx / (speed || 1);
-        const ny = planar > CONTACT_EPSILON ? dy / planar : ball.vy / (speed || 1);
-        const targetVx = (target.x - targetPrevious.x) / PHYSICS_STEP_SECONDS;
-        const targetVy = (target.y - targetPrevious.y) / PHYSICS_STEP_SECONDS;
-        const closing = (ball.vx - targetVx) * nx + (ball.vy - targetVy) * ny;
-        // A single overlap is consumed even if the bodies are already separating.
-        ball.duckContact = true;
-        if (
-            closing <= 0 ||
-            !this.pushDuck(side, {
-                x: ball.x,
-                y: ball.y,
-                direction: Math.atan2(ny, nx),
-            })
-        )
-            return;
-        const impulse = closing * (1 + DUCK_RESTITUTION);
-        ball.vx -= nx * impulse;
-        ball.vy -= ny * impulse;
-    }
     step(actions) {
         if (this.result !== null) return;
-        for (const player of this.players) player.applyAction(actions[player.side]);
-        this.restoreReflectors();
+        const courtPins = this.players.map(({ side }) =>
+            this.pins.filter((pin) => pin.court === side),
+        );
+        for (const player of this.players) {
+            player.applyAction(actions[player.side]);
+            this.restoreReflectors(player.side, courtPins[player.side]);
+        }
         for (let time = 0; time < STEP_SECONDS; time += PHYSICS_STEP_SECONDS) {
             const substep = PHYSICS_STEP_SECONDS;
             const previous = this.players.map(({ boss }) => pointOf(boss));
@@ -342,34 +312,34 @@ export class DuelGame {
                 balls.map((ball) => ({ ...pointOf(ball), inWorld: ball.inWorld })),
             );
             for (const player of this.players) player.advanceDuck(substep);
-            for (const player of this.players) player.advanceDelivery(substep);
+            for (const player of this.players)
+                player.advanceDelivery(substep, courtPins[player.side]);
             for (const player of this.players) {
                 const side = player.side;
-                const opponent = 1 - side;
                 for (const ball of player.balls) {
-                    player.advanceBall(
-                        ball,
-                        substep,
-                        ballPositions[side][ball.id],
-                        previous[side],
-                        false,
-                        (moving) => this.contactDuck(moving, opponent, previous[opponent]),
-                    );
+                    player.advanceBall(ball, substep, ballPositions[side][ball.id], previous[side]);
                     if (!ball.ready && ball.life > 0) {
-                        for (const pin of this.pins) player.ballContact(ball, pin);
+                        for (const pin of courtPins[side]) player.ballContact(ball, pin);
                     }
                 }
             }
         }
-        stepDuelPins(this, STEP_SECONDS);
+        const updatedCourtPins = stepDuelPins(this, STEP_SECONDS);
         this.pinContacts.time = this.time;
-        for (let i = 0; i < this.pins.length; i++) {
-            const a = this.pins[i];
-            if (a.deadAge > 1) continue;
-            for (let j = i + 1; j < this.pins.length; j++) {
-                const b = this.pins[j];
-                if (b.deadAge <= 1)
-                    BowlingGame.prototype.enemyContact.call(this.pinContacts, a, b, this.pinImpact);
+        for (const pins of updatedCourtPins) {
+            for (let i = 0; i < pins.length; i++) {
+                const a = pins[i];
+                if (a.deadAge > 1) continue;
+                for (let j = i + 1; j < pins.length; j++) {
+                    const b = pins[j];
+                    if (b.deadAge <= 1)
+                        BowlingGame.prototype.enemyContact.call(
+                            this.pinContacts,
+                            a,
+                            b,
+                            this.pinImpact,
+                        );
+                }
             }
         }
         if (this.impactPairs.size > 128) {
@@ -393,7 +363,9 @@ export class DuelGame {
             effects: this.effects,
             projectiles: this.projectiles,
             pinState: this.pinState,
-            reflective: this.arena.reflectors.map((rock) => rock.lifecycle),
+            reflective: this.courts.map(({ reflectors }) =>
+                reflectors.map((rock) => rock.lifecycle),
+            ),
             impactPairs: [...this.impactPairs],
         });
     }
@@ -412,13 +384,14 @@ export class DuelGame {
                 (pin) =>
                     isPosition(pin) &&
                     Object.hasOwn(ENEMY_TYPES, pin.kind) &&
-                    (pin.targetSide === 0 || pin.targetSide === 1) &&
+                    isCourt(pin.court) &&
                     Number.isSafeInteger(pin.expiresAtMs) &&
                     Number.isFinite(pin.hp),
             ) &&
             Array.isArray(state.projectiles) &&
-            state.projectiles.every((shot) => shot?.targetSide === 0 || shot?.targetSide === 1) &&
+            state.projectiles.every((shot) => isCourt(shot?.court)) &&
             Array.isArray(state.effects) &&
+            state.effects.every((effect) => isCourt(effect?.court)) &&
             Array.isArray(state.pinState?.targets) &&
             state.pinState.targets.length === 2 &&
             state.pinState.targets.every((target) => Number.isFinite(target?.clock?.nowMs)) &&
@@ -426,6 +399,18 @@ export class DuelGame {
             state.pinState.awarded.length === 2 &&
             state.pinState.awarded.every((value) => Number.isSafeInteger(value) && value >= 0) &&
             Number.isSafeInteger(state.pinState.rng) &&
+            Number.isSafeInteger(state.pinState.bonusRng) &&
+            Array.isArray(state.pinState.lastBonus) &&
+            state.pinState.lastBonus.length === 2 &&
+            state.pinState.lastBonus.every(
+                (bonus) =>
+                    bonus === null ||
+                    (Number.isSafeInteger(bonus?.tick) &&
+                        bonus.tick > 0 &&
+                        bonus.tick <= state.tick &&
+                        Number.isSafeInteger(bonus?.count) &&
+                        bonus.count > 0),
+            ) &&
             Number.isSafeInteger(state.pinState.nextWaveAtMs) &&
             Array.isArray(state.impactPairs) &&
             state.impactPairs.every(
@@ -433,14 +418,19 @@ export class DuelGame {
                     Array.isArray(pair) && typeof pair[0] === 'string' && Number.isFinite(pair[1]),
             ) &&
             Array.isArray(state.reflective) &&
-            state.reflective.length === this.arena.reflectors.length &&
+            state.reflective.length === this.courts.length &&
             state.reflective.every(
-                (rock, i) =>
-                    Number.isInteger(rock?.slotIndex) &&
-                    rock.slotIndex >= 0 &&
-                    rock.slotIndex < this.arena.reflectors[i].slots.length &&
-                    Number.isInteger(rock.seed) &&
-                    (rock.returnAtMs === null || Number.isFinite(rock.returnAtMs)),
+                (rocks, side) =>
+                    Array.isArray(rocks) &&
+                    rocks.length === this.courts[side].reflectors.length &&
+                    rocks.every(
+                        (rock, i) =>
+                            Number.isInteger(rock?.slotIndex) &&
+                            rock.slotIndex >= 0 &&
+                            rock.slotIndex < this.courts[side].reflectors[i].slots.length &&
+                            Number.isInteger(rock.seed) &&
+                            (rock.returnAtMs === null || Number.isFinite(rock.returnAtMs)),
+                    ),
             ),
         );
     }
@@ -456,11 +446,12 @@ export class DuelGame {
         this.pinState = copy.pinState;
         this.impactPairs = new Map(copy.impactPairs);
         this.pinContacts.impactPairs = this.impactPairs;
-        for (const player of this.players)
-            applyPlayer(player, copy.players[player.side], this.arena, this.time);
-        for (let i = 0; i < copy.reflective.length; i++) {
-            const { slotIndex, seed, returnAtMs } = copy.reflective[i];
-            Object.assign(this.arena.reflectors[i].lifecycle, { slotIndex, seed, returnAtMs });
+        for (const player of this.players) {
+            const { side } = player;
+            const court = this.courts[side];
+            applyPlayer(player, copy.players[side], court, this.time);
+            for (const [i, { slotIndex, seed, returnAtMs }] of copy.reflective[side].entries())
+                Object.assign(court.reflectors[i].lifecycle, { slotIndex, seed, returnAtMs });
         }
     }
 }

@@ -19,6 +19,7 @@ import { DUEL_TEAMS, renderDuel } from '../presentation/duel-view.mjs';
 import { createBowlingAudio } from '../presentation/audio.mjs';
 import { DUCK_COMBAT } from '../domain/combat-clock.mjs';
 import { DUEL_SCORE_GOAL } from '../domain/duel.mjs';
+import { DUEL_SPECIAL_KILLS } from '../domain/duel-pins.mjs';
 import { duckAimOpen, duckDashOpen } from '../domain/duck-recoil.mjs';
 import { renderThrowPad } from '../presentation/throw-pad.mjs';
 const SHOT_LABELS = {
@@ -27,6 +28,7 @@ const SHOT_LABELS = {
     rubber: ['고무 공', '강한 벽 반사'],
     spinner: ['회전 공', '깊은 훅'],
 };
+const TRANSFER_NOTICE_MS = 2000;
 // QA can supply a real-physics driver and faster clock; the shipped entry uses defaults.
 export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDemo = false } = {}) {
     const $ = (id) => document.getElementById(id),
@@ -63,6 +65,11 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         menuPanel = $('menu-panel');
     const gameScreen = $('game-screen'),
         gameControls = gameScreen.querySelector('.move-controls');
+    const opponentCourt = $('opponent-court');
+    const opponentCanvas = $('opponent-game');
+    const opponentContext = opponentCanvas.getContext('2d');
+    const incomingTransfer = $('duel-incoming');
+    const outgoingTransfer = $('duel-outgoing');
     function healthMeter(health) {
         const lifePips = Array.from({ length: DUCK_COMBAT.hitsToDefeat }, () => {
             const pip = document.createElement('i');
@@ -668,7 +675,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         clearInput();
         clearDuelOverlay();
         campaignKeys = { angle: input.keyAngle, power: input.keyPower };
-        input.keyAngle = match.side === 1 ? Math.PI / 2 : -Math.PI / 2;
+        input.keyAngle = -Math.PI / 2;
         input.keyPower = 0.7;
         gameScreen.dataset.mode = match.practice ? 'practice' : 'duel';
         gameScreen.dataset.side = String(match.side);
@@ -678,6 +685,9 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         const opponentLabel = match.practice ? 'AI' : '상대';
         setText($('opponent-score-label'), opponentLabel);
         opponentScore.progress.setAttribute('aria-label', `${opponentLabel} 처치 점수`);
+        setText($('opponent-court-label'), `${opponentLabel} 코트`);
+        opponentCanvas.setAttribute('aria-label', `${opponentLabel} 코트`);
+        opponentCourt.hidden = false;
         menuButton.hidden = false;
         setScreen('game');
         canvas.focus({ preventScroll: true });
@@ -695,6 +705,12 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         health.hidden = false;
         localScore.box.hidden = true;
         opponentScore.box.hidden = true;
+        opponentCourt.hidden = true;
+        for (const transfer of [incomingTransfer, outgoingTransfer]) {
+            transfer.hidden = true;
+            delete transfer.dataset.phase;
+            setText(transfer, '');
+        }
         showMenu(null);
         setScreen('maps');
     }
@@ -725,14 +741,48 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         if ((!canPlay() || !duckAimOpen(local.boss)) && (aim || input.id !== null)) input.cancel();
         movement.refresh();
         setText($('round'), practice ? 'AI 연습' : '1대1 대전');
-        setText($('objective'), status);
+        setText(
+            $('objective'),
+            status || `다음 전송 ${local.score % DUEL_SPECIAL_KILLS}/${DUEL_SPECIAL_KILLS}`,
+        );
         localScore.update(local.score);
         opponentScore.update(remote.score);
         updateControls({ ready, nextBallType: ready ? local.selectedType : null }, local);
         renderDuel(ctx, matchGame, side, aim ? { ...aim, detached: true } : null);
+        renderDuel(opponentContext, matchGame, side, null, 1 - side);
+        updateDuelTransfer(matchGame, side, confirmedTick);
         paintThrowPad(local, ready, !finished && (!match.connected || Boolean(menuPage)));
         gameScreen.dataset.tick = String(matchGame.tick);
         gameScreen.dataset.confirmedTick = String(confirmedTick);
+    }
+    function updateDuelTransfer(match, side, confirmedTick) {
+        const { awarded, lastBonus } = match.pinState;
+        const show = (element, fromSide, receiving) => {
+            const arrival = lastBonus[1 - fromSide];
+            const confirming = arrival && arrival.tick - 1 > confirmedTick;
+            const pending =
+                Math.floor(match.players[fromSide].score / DUEL_SPECIAL_KILLS) -
+                awarded[fromSide] +
+                (confirming ? arrival.count : 0);
+            const arrived =
+                arrival &&
+                !confirming &&
+                (match.tick - arrival.tick) * STEP_SECONDS * 1000 < TRANSFER_NOTICE_MS;
+            element.hidden = match.result !== null || (!arrived && pending <= 0);
+            if (element.hidden) return;
+            const phase = arrived ? 'arrived' : 'queued';
+            if (element.dataset.phase !== phase) element.dataset.phase = phase;
+            const label = arrived
+                ? receiving
+                    ? '특수 핀 도착'
+                    : '전송 완료'
+                : receiving
+                  ? '들어올 특수 핀'
+                  : '보낼 특수 핀';
+            setText(element, `${label} +${arrived ? arrival.count : pending}`);
+        };
+        show(incomingTransfer, 1 - side, true);
+        show(outgoingTransfer, side, false);
     }
     function updateRound(s) {
         const trail = game.expedition;

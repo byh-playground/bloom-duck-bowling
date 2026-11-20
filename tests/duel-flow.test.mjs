@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createDuelBot } from '../src/domain/duel-bot.mjs';
 import { DuelGame, DUEL_SCORE_GOAL } from '../src/domain/duel.mjs';
+import { DUEL_SPECIAL_KILLS, DUEL_WAVE_MS } from '../src/domain/duel-pins.mjs';
 
 const seed = 42;
 
@@ -18,7 +19,7 @@ test('a two-player match ends and replays identically from a mid-game checkpoint
     assert.equal(game.players[0].selectedType, game.players[1].selectedType);
     game.step(act());
     for (const side of [0, 1]) {
-        const wave = game.pins.filter((pin) => pin.targetSide === side);
+        const wave = game.pins.filter((pin) => pin.court === side);
         assert.equal(wave.filter((pin) => pin.kind === 'grunt').length, 15);
         assert.equal(wave.filter((pin) => pin.kind !== 'grunt').length, 1);
     }
@@ -30,7 +31,7 @@ test('a two-player match ends and replays identically from a mid-game checkpoint
 
     const replay = new DuelGame(matchSeed);
     const crossed = structuredClone(snapshot);
-    crossed.players[0].boss.y = game.centerLane.y;
+    crossed.players[0].boss.y = game.courts[0].top - 1;
     assert.throws(() => replay.importState(crossed), /Invalid Duck Bowling duel snapshot/);
     replay.importState(snapshot);
     assert.deepEqual(replay.exportState(), snapshot);
@@ -38,69 +39,91 @@ test('a two-player match ends and replays identically from a mid-game checkpoint
         const actions = act();
         game.step(actions);
         replay.step(actions);
-        const { y, halfWidth } = game.centerLane;
-        const [host, guest] = game.players.map((player) => player.boss);
-        assert.ok(host.y - host.r >= y + halfWidth);
-        assert.ok(guest.y + guest.r <= y - halfWidth);
+        for (const { boss, duckBounds } of game.players) {
+            assert.ok(boss.y >= duckBounds.minY && boss.y <= duckBounds.maxY);
+        }
     }
-    assert.equal(game.result, 0);
-    assert.ok(game.players[0].score >= DUEL_SCORE_GOAL);
-    assert.ok(game.players[1].score > 0);
+    assert.equal(game.result, 1);
+    assert.ok(game.players[1].score >= DUEL_SCORE_GOAL);
+    assert.ok(game.players[0].score > 0);
     assert.deepEqual(replay.exportState(), game.exportState());
 });
 
-test('a ball crosses the center lane and knocks the duck back without dealing damage', () => {
+test('independent courts exchange bonus pins after scored hits', () => {
     const game = new DuelGame(seed);
     const [host, guest] = game.players;
-    const ball = host.balls[0];
-    const target = guest.boss;
-    Object.assign(ball, {
-        x: target.x,
-        y: game.centerLane.y + game.centerLane.halfWidth + ball.r + 4,
-        z: 0,
-        vx: 0,
-        vy: -1080,
-        phase: 'rolling',
-        ready: false,
-        held: false,
-        inWorld: true,
-        life: 2,
-    });
-    for (let tick = 0; tick < 40 && !target.recoil; tick++) game.step([{}, {}]);
-    assert.ok(ball.y < game.centerLane.y - game.centerLane.halfWidth);
-    assert.equal(target.hp, target.maxHp);
-    assert.ok(target.recoil);
+    assert.equal(host.boss.y, guest.boss.y);
+    assert.equal(host.duckBounds.minY, guest.duckBounds.minY);
+    assert.ok(host.duckBounds.minY < host.arena.centerY);
 
-    // An overlapping ball cannot hit again until it has separated.
-    const previous = { x: target.x, y: target.y };
-    const contact = () => {
-        ball.x = target.x;
-        ball.y = target.y + target.r;
-        ball.z = target.recoil?.z ?? 0;
-        ball.vx = 0;
-        ball.vy = -1080;
-        game.contactDuck(ball, 1, previous);
+    game.step([{}, {}]);
+    const openingPins = game.pins.filter((pin) => pin.court === host.side);
+    const awayPin = game.pins.find((pin) => pin.court === guest.side);
+    const ball = host.balls[0];
+    const hit = (pin) => {
+        Object.assign(ball, {
+            x: pin.x,
+            y: pin.y + pin.r + ball.r - 2,
+            z: 0,
+            vx: 0,
+            vy: -1080,
+            held: false,
+        });
+        host.ballContact(ball, pin);
     };
-    const separate = () => {
-        ball.y = target.y + target.r + ball.r + 10;
-        game.contactDuck(ball, 1, previous);
-    };
-    separate();
-    contact();
-    const recoil = target.recoil;
-    contact();
-    assert.equal(target.recoil, recoil);
-    separate();
-    contact();
-    assert.notEqual(target.recoil, recoil);
-    assert.equal(target.hp, target.maxHp);
+    const awayHp = awayPin.hp;
+    hit(awayPin);
+    assert.equal(awayPin.hp, awayHp);
+    assert.equal(host.score, 0);
+
+    for (const pin of openingPins
+        .filter(({ kind }) => kind === 'grunt')
+        .slice(0, DUEL_SPECIAL_KILLS))
+        hit(pin);
+    assert.equal(host.score, DUEL_SPECIAL_KILLS);
+    assert.equal(guest.score, 0);
+    assert.deepEqual(game.pinState.lastBonus, [null, null]);
+
+    const firstBonusWavePin = game.pinState.nextPinId;
+    while (game.clock.nowMs < DUEL_WAVE_MS) game.step([{}, {}]);
+    const bonusCount = Math.floor(host.score / DUEL_SPECIAL_KILLS);
+    assert.deepEqual(game.pinState.awarded, [0, 0]);
+    game.step([{}, {}]);
+    assert.deepEqual(game.pinState.awarded, [bonusCount, 0]);
+    assert.deepEqual(game.pinState.lastBonus, [null, { tick: game.tick, count: bonusCount }]);
+    assert.equal(
+        game.pins.filter((pin) => pin.id >= firstBonusWavePin && pin.court === host.side).length,
+        16,
+    );
+    assert.equal(
+        game.pins.filter((pin) => pin.id >= firstBonusWavePin && pin.court === guest.side).length,
+        16 + bonusCount,
+    );
+    assert.deepEqual(
+        game.effects
+            .filter((effect) => effect.kind === 'special-drop')
+            .map((effect) => effect.court),
+        Array(bonusCount).fill(guest.side),
+    );
+
+    const homeRock = game.courts[0].reflectors[0];
+    const guestRock = game.courts[1].reflectors[0];
+    assert.notEqual(homeRock.lifecycle, guestRock.lifecycle);
+    homeRock.lifecycle.returnAtMs = game.clock.nowMs + 1000;
+    assert.equal(guestRock.lifecycle.returnAtMs, null);
+    const replay = new DuelGame(seed);
+    replay.importState(game.exportState());
+    assert.deepEqual(
+        replay.courts.map(({ reflectors }) => reflectors[0].lifecycle),
+        game.courts.map(({ reflectors }) => reflectors[0].lifecycle),
+    );
 });
 
 test('a neutral pin targeting the bowler can take another hit after separation', () => {
     const game = new DuelGame(seed);
     for (let tick = 0; tick < 121; tick++) game.step([{}, {}]);
     const host = game.players[0];
-    const pin = game.pins.find((candidate) => candidate.targetSide === 0);
+    const pin = game.pins.find((candidate) => candidate.court === 0);
     const ball = host.balls[0];
     ball.held = false;
     const placeBall = (distance) => {
