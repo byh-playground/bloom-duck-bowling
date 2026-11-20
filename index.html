@@ -33,7 +33,7 @@
                     <p id="boot-status" role="status">게임을 불러오는 중…</p>
                     <a id="boot-retry" class="front-back" href="" hidden>다시 불러오기</a>
                     <small id="product-version" class="product-version" title="게임 버전"
-                        >0.6.0</small
+                        >0.7.0</small
                     >
                 </div>
             </section>
@@ -270,60 +270,6 @@
             </template>
             <output id="summary" hidden></output>
         </main>
-        <dialog id="duel-dialog" aria-labelledby="duel-title">
-            <div class="duel-shell">
-                <header class="duel-heading">
-                    <h2 id="duel-title">1대1 대전</h2>
-                    <button id="duel-close" type="button">닫기</button>
-                </header>
-                <p id="duel-status" class="duel-status" role="status"></p>
-                <section id="duel-match" class="duel-match" aria-label="대전 경기" hidden>
-                    <div class="duel-score">
-                        <span class="duel-score-local">내 체력 <b id="duel-local-hp"></b></span>
-                        <span id="duel-kills" class="duel-kills" aria-label="진영 처치 수"></span>
-                        <span class="duel-score-remote"
-                            ><span id="duel-opponent">상대</span> 체력 <b id="duel-remote-hp"></b
-                        ></span>
-                    </div>
-                    <div class="duel-court">
-                        <canvas
-                            id="duel-game"
-                            width="640"
-                            height="720"
-                            tabindex="0"
-                            aria-label="대전 경기장"
-                        ></canvas>
-                        <section id="duel-result" class="duel-result" hidden>
-                            <h3 id="duel-result-message"></h3>
-                            <button id="duel-exit-match" class="duel-primary" type="button">
-                                돌아가기
-                            </button>
-                        </section>
-                    </div>
-                    <div class="duel-controls">
-                        <div id="duel-stick" role="group" aria-label="대시 방향" tabindex="0">
-                            <span class="stick-cross" aria-hidden="true">✥</span>
-                            <i class="stick-knob" aria-hidden="true"></i>
-                            <small aria-hidden="true">대시</small>
-                        </div>
-                        <div class="duel-throw-wrap">
-                            <span
-                                id="duel-ammo"
-                                class="duel-ammo"
-                                aria-label="사용 가능한 공"
-                            ></span>
-                            <canvas
-                                id="duel-throw"
-                                width="400"
-                                height="180"
-                                tabindex="0"
-                                aria-label="굴리기 영역"
-                            ></canvas>
-                        </div>
-                    </div>
-                </section>
-            </div>
-        </dialog>
         <script type="module" src="src/app/main.mjs"></script>
     </body>
 </html>

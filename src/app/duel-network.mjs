@@ -37,9 +37,10 @@ function packShot(vx, vy, spin) {
 }
 
 function readAction({ input, commands }) {
-    const move = commands.find(({ payload }) => payload.length === 2)?.payload ?? input;
+    const dash = commands.find(({ payload }) => payload.length === 2);
+    const move = dash?.payload ?? input;
     const shot = commands.find(({ payload }) => payload.length === 6)?.payload;
-    const action = { moveX: unpackAxis(move[0]), moveY: unpackAxis(move[1]) };
+    const action = { moveX: unpackAxis(move[0]), moveY: unpackAxis(move[1]), dash: Boolean(dash) };
     if (shot) {
         const view = new DataView(shot.buffer, shot.byteOffset, shot.byteLength);
         const vx = view.getInt16(0, true);
@@ -323,6 +324,7 @@ export function openDuel({
     return {
         opened,
         close,
+        clearInput,
         setMove(x, y) {
             if (x === 0 && y === 0) {
                 held.fill(0);

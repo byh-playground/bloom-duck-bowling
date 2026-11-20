@@ -1041,6 +1041,11 @@ export class BowlingGame {
             rest -= h;
         }
     }
+    get dashRechargeProgress() {
+        return this.dashCharges === this.dashCapacity
+            ? 0
+            : Math.max(0, Math.min(1, 1 - this.dashRechargeRemaining / 0.5));
+    }
     snapshot() {
         return {
             floorBalls: this.balls
@@ -1058,10 +1063,7 @@ export class BowlingGame {
             dashCharges: this.dashCharges,
             dashCapacity: this.dashCapacity,
             dashRechargeRemaining: this.dashRechargeRemaining,
-            dashRechargeProgress:
-                this.dashCharges === this.dashCapacity
-                    ? 0
-                    : Math.max(0, Math.min(1, 1 - this.dashRechargeRemaining / 0.5)),
+            dashRechargeProgress: this.dashRechargeProgress,
             reflectors: (this.arena.reflectors ?? []).map((rock) => ({
                 x: rock.x,
                 y: rock.y,
