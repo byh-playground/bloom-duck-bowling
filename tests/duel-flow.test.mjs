@@ -20,7 +20,13 @@ test('a two-player match ends and replays identically from a mid-game checkpoint
         [3, 3],
     );
     assert.equal(game.players[0].selectedType, game.players[1].selectedType);
-    for (let tick = 0; tick < 145; tick++) game.step(attack(tick));
+    game.step(attack(0));
+    for (const side of [0, 1]) {
+        const wave = game.pins.filter((pin) => pin.side === side);
+        assert.equal(wave.filter((pin) => pin.kind === 'grunt').length, 15);
+        assert.equal(wave.filter((pin) => pin.kind !== 'grunt').length, 1);
+    }
+    for (let tick = 1; tick < 145; tick++) game.step(attack(tick));
     const snapshot = game.exportState();
     assert.ok(game.players[0].stats.shots > 0);
     assert.ok(game.pins.some((pin) => pin.side === 1));
@@ -43,7 +49,7 @@ test('a two-player match ends and replays identically from a mid-game checkpoint
     assert.deepEqual(replay.exportState(), game.exportState());
 });
 
-test('a ball can cross the center lane and hits again only after separation', () => {
+test('a ball crosses the center lane and knocks the duck back without dealing damage', () => {
     const game = new DuelGame(seed);
     const [host, guest] = game.players;
     const ball = host.balls[0];
@@ -60,9 +66,10 @@ test('a ball can cross the center lane and hits again only after separation', ()
         inWorld: true,
         life: 2,
     });
-    for (let tick = 0; tick < 40 && target.hp === target.maxHp; tick++) game.step([{}, {}]);
+    for (let tick = 0; tick < 40 && !target.recoil; tick++) game.step([{}, {}]);
     assert.ok(ball.y < game.centerLane.y - game.centerLane.halfWidth);
-    assert.equal(target.hp, 80);
+    assert.equal(target.hp, target.maxHp);
+    assert.ok(target.recoil);
 
     // An overlapping ball cannot hit again until it has separated.
     const previous = { x: target.x, y: target.y };
@@ -80,12 +87,13 @@ test('a ball can cross the center lane and hits again only after separation', ()
     };
     separate();
     contact();
-    assert.equal(target.hp, 60);
+    const recoil = target.recoil;
     contact();
-    assert.equal(target.hp, 60);
+    assert.equal(target.recoil, recoil);
     separate();
     contact();
-    assert.equal(target.hp, 40);
+    assert.notEqual(target.recoil, recoil);
+    assert.equal(target.hp, target.maxHp);
 });
 
 test('an opponent pin can take another hit from the same ball after separation', () => {

@@ -302,7 +302,8 @@ export class DuelGame {
         }
     }
     contactDuck(ball, side, targetPrevious) {
-        const target = this.players[side].boss;
+        const player = this.players[side];
+        const target = player.boss;
         const dx = target.x - ball.x,
             dy = target.y - ball.y;
         const dz = (target.recoil?.z ?? 0) - (ball.z ?? 0);
@@ -324,14 +325,15 @@ export class DuelGame {
         ball.duckContact = true;
         if (
             closing <= 0 ||
-            !this.hurtDuck(side, DUCK_COMBAT.damagePerHit, {
+            target.hp <= 0 ||
+            !startDuckRecoil(player, {
                 x: ball.x,
                 y: ball.y,
                 direction: Math.atan2(ny, nx),
-                source: 'enemy-ball',
             })
         )
             return;
+        this.fx('hit', target.x, target.y, 20, target.r * 0.5, '#d3e7d8');
         const impulse = closing * (1 + DUCK_RESTITUTION);
         ball.vx -= nx * impulse;
         ball.vy -= ny * impulse;

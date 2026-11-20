@@ -2,15 +2,13 @@ import { advanceCombatClock, COMBAT_BEAT_MS, combatClock } from './combat-clock.
 import { BODY_GRAVITY } from './duck-recoil.mjs';
 import { ENEMY_TYPES, configureEnemy, flagSupport, ignite, specialDrive } from './enemies.mjs';
 import { stepPinBlast } from './pin-blast.mjs';
+import { LARGE_PIN_FORMATION, PIN_DEPTH, PIN_GAP, pinSlots } from './pin-formation.mjs';
 import { stepEnemyProjectiles, stepPinProjectileThreat } from './pin-projectiles.mjs';
 import { nextRandom } from './random.mjs';
 import { resolveReflectors } from './terrain.mjs';
 
 export const DUEL_WAVE_MS = 4000;
 export const DUEL_SPECIAL_KILLS = 6;
-const FORMATION_ROWS = 3;
-const PIN_GAP = 34;
-const PIN_DEPTH = 31;
 const PIN_APPROACH_SPEED = 43;
 const SPAWN_INSET = 250;
 const FIGHT_REACH = 10;
@@ -114,21 +112,13 @@ function spawnWave(game) {
         const sign = side === 0 ? -1 : 1;
         const y = side === 0 ? a.bottom - SPAWN_INSET : a.top + SPAWN_INSET;
         const facing = (sign * Math.PI) / 2;
-        for (let row = 0; row < FORMATION_ROWS; row++) {
-            for (let col = 0; col <= row; col++) {
-                makePin(
-                    game,
-                    side,
-                    'grunt',
-                    x + (col - row / 2) * PIN_GAP,
-                    y - sign * row * PIN_DEPTH,
-                    facing,
-                );
-            }
+        for (const slot of pinSlots(LARGE_PIN_FORMATION, { x, y, nx: 0, ny: sign })) {
+            makePin(game, side, 'grunt', slot.x, slot.y, facing);
         }
-        const pending = game.pinState.sides[side].pending;
+        const sideState = game.pinState.sides[side];
+        const specials = [drawSpecial(sideState), ...sideState.pending];
         const specialSpacing = ENEMY_TYPES.giant.r * 2 + FIGHT_REACH;
-        for (let i = 0; i < pending.length; i++) {
+        for (let i = 0; i < specials.length; i++) {
             const flank = i % 2 ? 1 : -1;
             const lane = Math.floor(i / 2) % 2;
             const rank = Math.floor(i / 4);
@@ -136,13 +126,13 @@ function spawnWave(game) {
             makePin(
                 game,
                 side,
-                pending[i],
+                specials[i],
                 x + flank * offset,
                 y - sign * PIN_DEPTH + sign * rank * specialSpacing,
                 facing,
             );
         }
-        pending.length = 0;
+        sideState.pending.length = 0;
     }
     game.pinState.waves++;
     game.pinState.nextWaveAtMs += DUEL_WAVE_MS;

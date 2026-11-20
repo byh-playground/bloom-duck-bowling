@@ -9,6 +9,7 @@ import {
 import { BowlingGame } from './sim.mjs';
 import { advanceDashPose, DASH_POSE_SECONDS } from './bowler.mjs';
 import { manualBounds } from './locomotion.mjs';
+import { LARGE_PIN_FORMATION, pinSlots } from './pin-formation.mjs';
 import {
     createExpedition,
     enterExpeditionRoom,
@@ -63,23 +64,7 @@ export const STAGES = Object.freeze(
         },
     ].map((s) => Object.freeze({ ...s, kinds: Object.freeze(s.kinds) })),
 );
-const PIN_COUNT = 10,
-    PIN_LARGE_COUNT = 15,
-    PIN_GAP = 34,
-    PIN_DEPTH = 31;
-function pinSlots(count, rack) {
-    const slots = [];
-    for (let row = 0; slots.length < count; row++)
-        for (let col = 0; col <= row; col++) {
-            const across = (col - row / 2) * PIN_GAP,
-                back = row * PIN_DEPTH;
-            slots.push({
-                x: rack.x - rack.nx * back + rack.ny * across,
-                y: rack.y - rack.ny * back - rack.nx * across,
-            });
-        }
-    return slots;
-}
+const PIN_COUNT = 10;
 const SPECIAL_SLOTS = Object.freeze({ hopper: 0, shooter: -2, lobber: -1 });
 const AVAILABLE_SPECIALS = Object.freeze([
     [],
@@ -89,7 +74,7 @@ const AVAILABLE_SPECIALS = Object.freeze([
     ['lobber', 'shooter', 'hopper'],
 ]);
 function packetRoster(stage, packet, stageIndex) {
-    const count = packet % 3 === 0 ? PIN_LARGE_COUNT : PIN_COUNT;
+    const count = packet % 3 === 0 ? LARGE_PIN_FORMATION : PIN_COUNT;
     if (stage === STAGES[0] && packet === 0) return Array(count).fill('grunt');
     const roster = Array.from(
         { length: count },
