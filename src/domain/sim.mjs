@@ -700,13 +700,16 @@ export class BowlingGame {
             (this.impactPairs.get(key) || -100) < this.time - 0.28
         ) {
             this.impactPairs.set(key, this.time);
+            if (onImpact) {
+                if (scoreSerial != null) {
+                    const scoreSource = ca === scoreSerial ? a : b;
+                    onImpact(a, b, impulse, scoreSerial, scoreSource.chainDepth + 1);
+                }
+                return;
+            }
             const source = a.sourceShot != null ? a : b,
                 shot = source.sourceShot,
                 depth = source.chainDepth + 1;
-            if (onImpact) {
-                onImpact(a, b, impulse, shot, depth);
-                return;
-            }
             for (const u of [a, b]) {
                 if (u.hp > 0) {
                     this.hurt(

@@ -19,7 +19,6 @@ const BODY_DRAG = 3;
 const BOMB_RADIUS = 105;
 const BOMB_IMPULSE = 220;
 const BOMB_PIN_DAMAGE = 22;
-const BOMB_DUCK_DAMAGE = 24;
 const SPECIALS = Object.keys(ENEMY_TYPES).filter((kind) => kind !== 'grunt');
 const SPECIAL_DRAW_WEIGHT = SPECIALS.reduce((total, kind) => total + (kind === 'giant' ? 1 : 2), 0);
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
@@ -166,7 +165,11 @@ export function hurtDuelPin(game, pin, { damage, vx = 0, vy = 0, vz = 0, stun = 
     ignite(pin);
     game.fx('hit', pin.x, pin.y, pin.z + 12, 16, '#ffe6a6');
     if (pin.hp === 0) {
-        if (side === 0 || side === 1) game.players[side].kills++;
+        const player = game.players[side];
+        if (player) {
+            player.kills++;
+            if (depth !== undefined) player.score++;
+        }
         game.fx('ko', pin.x, pin.y, pin.z + 20, 16, '#f4ba77');
     }
     return true;
@@ -310,7 +313,7 @@ function explodeBomb(pin, game, dt) {
     const opponent = 1 - pin.side;
     const duck = game.players[opponent].boss;
     if (pin.z < 40 && Math.hypot(duck.x - pin.x, duck.y - pin.y) < BOMB_RADIUS + duck.r) {
-        game.hurtDuck(opponent, BOMB_DUCK_DAMAGE, { x: pin.x, y: pin.y, strength: 1.25 });
+        game.pushDuck(opponent, { x: pin.x, y: pin.y, strength: 1.25 });
     }
 }
 
@@ -339,7 +342,7 @@ function teamWorld(game, side, pins) {
         set enemyProjectileSerial(value) {
             game.pinState.projectileSerial = value;
         },
-        damageBoss: (amount, _source, impact) => game.hurtDuck(1 - side, amount, impact),
+        damageBoss: (_amount, _source, impact) => game.pushDuck(1 - side, impact),
         fx: (...args) => game.fx(...args),
     };
 }

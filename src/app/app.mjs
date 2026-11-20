@@ -18,6 +18,7 @@ import { render, project, renderHomeDuck } from '../presentation/render.mjs';
 import { DUEL_TEAMS, renderDuel } from '../presentation/duel-view.mjs';
 import { createBowlingAudio } from '../presentation/audio.mjs';
 import { DUCK_COMBAT } from '../domain/combat-clock.mjs';
+import { DUEL_SCORE_GOAL } from '../domain/duel.mjs';
 import { duckAimOpen, duckDashOpen } from '../domain/duck-recoil.mjs';
 import { renderThrowPad } from '../presentation/throw-pad.mjs';
 const SHOT_LABELS = {
@@ -62,9 +63,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         menuPanel = $('menu-panel');
     const gameScreen = $('game-screen'),
         gameControls = gameScreen.querySelector('.move-controls');
-    function healthMeter(health, team) {
-        health.style.setProperty('--team-ink', team.ink);
-        health.style.setProperty('--team-fill', team.light);
+    function healthMeter(health) {
         const lifePips = Array.from({ length: DUCK_COMBAT.hitsToDefeat }, () => {
             const pip = document.createElement('i');
             pip.className = 'life-pip';
@@ -86,8 +85,26 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
             );
         };
     }
-    const updateHealth = healthMeter($('health'), DUEL_TEAMS.local);
-    const updateOpponentHealth = healthMeter($('opponent-life'), DUEL_TEAMS.opponent);
+    const health = $('health');
+    const updateHealth = healthMeter(health);
+    function scoreMeter(id, team) {
+        const box = $(id + '-score');
+        const value = $(id + '-score-value');
+        const progress = $(id + '-score-progress');
+        box.style.setProperty('--team-ink', team.ink);
+        box.style.setProperty('--team-fill', team.light);
+        progress.max = DUEL_SCORE_GOAL;
+        return {
+            box,
+            progress,
+            update(score) {
+                setText(value, `${score} / ${DUEL_SCORE_GOAL}`);
+                if (progress.value !== Math.min(score, DUEL_SCORE_GOAL)) progress.value = score;
+            },
+        };
+    }
+    const localScore = scoreMeter('local', DUEL_TEAMS.local);
+    const opponentScore = scoreMeter('opponent', DUEL_TEAMS.opponent);
     const bowlerSelect = $('bowler-select');
     if (!showcaseDemo && BOWLERS.length > 1) {
         bowlerSelect.replaceChildren(
@@ -655,10 +672,12 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         input.keyPower = 0.7;
         gameScreen.dataset.mode = match.practice ? 'practice' : 'duel';
         gameScreen.dataset.side = String(match.side);
-        $('local-health-label').hidden = false;
-        $('health').setAttribute('aria-label', '내 체력');
-        $('opponent-health').hidden = false;
-        setText($('opponent-health-label'), match.practice ? 'AI 체력' : '상대 체력');
+        health.hidden = true;
+        localScore.box.hidden = false;
+        opponentScore.box.hidden = false;
+        const opponentLabel = match.practice ? 'AI' : '상대';
+        setText($('opponent-score-label'), opponentLabel);
+        opponentScore.progress.setAttribute('aria-label', `${opponentLabel} 처치 점수`);
         menuButton.hidden = false;
         setScreen('game');
         canvas.focus({ preventScroll: true });
@@ -673,9 +692,9 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         delete gameScreen.dataset.side;
         delete gameScreen.dataset.tick;
         delete gameScreen.dataset.confirmedTick;
-        $('local-health-label').hidden = true;
-        $('health').setAttribute('aria-label', '체력');
-        $('opponent-health').hidden = true;
+        health.hidden = false;
+        localScore.box.hidden = true;
+        opponentScore.box.hidden = true;
         showMenu(null);
         setScreen('maps');
     }
@@ -701,14 +720,14 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         const match = duel.match;
         const { game: matchGame, side, finished, practice, status, confirmedTick } = match;
         const local = matchPlayer(match);
-        const remote = matchGame.players[1 - side].boss;
+        const remote = matchGame.players[1 - side];
         const ready = local.balls.filter((ball) => ball.ready).length;
         if ((!canPlay() || !duckAimOpen(local.boss)) && (aim || input.id !== null)) input.cancel();
         movement.refresh();
         setText($('round'), practice ? 'AI 연습' : '1대1 대전');
-        setText($('objective'), status || `처치 ${local.kills}`);
-        updateHealth(local.boss.hp);
-        updateOpponentHealth(remote.hp);
+        setText($('objective'), status);
+        localScore.update(local.score);
+        opponentScore.update(remote.score);
         updateControls({ ready, nextBallType: ready ? local.selectedType : null }, local);
         renderDuel(ctx, matchGame, side, aim ? { ...aim, detached: true } : null);
         paintThrowPad(local, ready, !finished && (!match.connected || Boolean(menuPage)));
