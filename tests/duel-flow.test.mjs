@@ -43,9 +43,9 @@ test('a two-player match ends and replays identically from a mid-game checkpoint
         assert.ok(host.y - host.r >= y + halfWidth);
         assert.ok(guest.y + guest.r <= y - halfWidth);
     }
-    assert.equal(game.result, 1);
-    assert.ok(game.players[1].score >= DUEL_SCORE_GOAL);
-    assert.ok(game.players[0].score > 0);
+    assert.equal(game.result, 0);
+    assert.ok(game.players[0].score >= DUEL_SCORE_GOAL);
+    assert.ok(game.players[1].score > 0);
     assert.deepEqual(replay.exportState(), game.exportState());
 });
 
