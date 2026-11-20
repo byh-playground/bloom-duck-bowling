@@ -22,11 +22,11 @@ const DASH_REACH = MANUAL.burstSpeed * MANUAL.burstDuration;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const distanceTo = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
-function nearestEnemyPin(pins, side, duck) {
+function nearestPin(pins, duck) {
     let nearest = null;
     let distance = Infinity;
     for (const pin of pins) {
-        if (pin.side === side || pin.hp <= 0 || pin.z > 60) continue;
+        if (pin.hp <= 0 || pin.z > 60) continue;
         const candidateDistance = distanceTo(duck, pin);
         if (candidateDistance >= distance) continue;
         nearest = pin;
@@ -121,7 +121,7 @@ export function createDuelBot() {
             return IDLE;
         nextDecisionMs = nowMs + PRACTICE.reactionMs;
 
-        const targetPin = nearestEnemyPin(game.pins, side, duck);
+        const targetPin = nearestPin(game.pins, duck);
         const canDash = player.dashCharges > 0 && duckDashOpen(duck);
         const canShoot = duckAimOpen(duck) && player.balls.some((ball) => ball.ready && ball.held);
         const incoming = canDash && nowMs >= nextDodgeMs && incomingPosition(duck, opponent.balls);

@@ -33,7 +33,6 @@ class DuelPlayer extends BowlingGame {
         });
         this.match = match;
         this.side = side;
-        this.kills = 0;
         this.score = 0;
         this.bag = new BallBag(seed, true);
         this.selectedType = this.bag.draw();
@@ -64,7 +63,6 @@ class DuelPlayer extends BowlingGame {
         this.match.fx(...args);
     }
     ballContact(ball, pin) {
-        if (pin.side === this.side) return;
         if (ball.hitIds.has(pin.id)) {
             const dz =
                 ball.held || pin.projectileHop || ball.vault
@@ -135,7 +133,6 @@ function packPlayer(player) {
         boss,
         balls,
         bag: player.bag.snapshot(),
-        kills: player.kills,
         score: player.score,
         dashCharges: player.dashCharges,
         dashRechargeRemaining: player.dashRechargeRemaining,
@@ -154,7 +151,6 @@ function packPlayer(player) {
 function applyPlayer(player, packed, field, time) {
     const { boss, balls, bag } = packed;
     Object.assign(player, {
-        kills: packed.kills,
         score: packed.score,
         dashCharges: packed.dashCharges,
         dashRechargeRemaining: packed.dashRechargeRemaining,
@@ -194,11 +190,8 @@ function validPlayer(packed, side, player) {
         packed.boss.y >= player.duckBounds.minY &&
         packed.boss.y <= player.duckBounds.maxY &&
         packed.boss.hp === DUCK_COMBAT.maxHp &&
-        Number.isSafeInteger(packed.kills) &&
-        packed.kills >= 0 &&
         Number.isSafeInteger(packed.score) &&
         packed.score >= 0 &&
-        packed.score <= packed.kills &&
         Number.isInteger(packed.dashCharges) &&
         Number.isFinite(packed.dashRechargeRemaining) &&
         Object.hasOwn(BALL_TYPES, packed.selectedType) &&
@@ -261,7 +254,7 @@ export class DuelGame {
     resolvePinImpact(a, b, impulse, side, depth) {
         if (side !== 0 && side !== 1) return;
         for (const pin of [a, b]) {
-            if (pin.side === side || pin.hp <= 0) continue;
+            if (pin.hp <= 0) continue;
             const kick = impulse / Math.max(1, pin.mass);
             const vz =
                 kick > PIN_LAUNCH_KICK
@@ -277,8 +270,8 @@ export class DuelGame {
     fx(...args) {
         BowlingGame.prototype.fx.call(this, ...args);
     }
-    hurtPin(pin, amount, side, impact = {}) {
-        return hurtDuelPin(this, pin, { damage: amount, side, ...impact });
+    hurtPin(pin, amount, playerIndex, impact = {}) {
+        return hurtDuelPin(this, pin, { damage: amount, playerIndex, ...impact });
     }
     pushDuck(side, impact) {
         const player = this.players[side];
@@ -419,16 +412,20 @@ export class DuelGame {
                 (pin) =>
                     isPosition(pin) &&
                     Object.hasOwn(ENEMY_TYPES, pin.kind) &&
-                    (pin.side === 0 || pin.side === 1) &&
+                    (pin.targetSide === 0 || pin.targetSide === 1) &&
+                    Number.isSafeInteger(pin.expiresAtMs) &&
                     Number.isFinite(pin.hp),
             ) &&
             Array.isArray(state.projectiles) &&
+            state.projectiles.every((shot) => shot?.targetSide === 0 || shot?.targetSide === 1) &&
             Array.isArray(state.effects) &&
-            Array.isArray(state.pinState?.sides) &&
-            state.pinState.sides.length === 2 &&
-            state.pinState.sides.every(
-                (team) => Number.isFinite(team?.clock?.nowMs) && Array.isArray(team?.pending),
-            ) &&
+            Array.isArray(state.pinState?.targets) &&
+            state.pinState.targets.length === 2 &&
+            state.pinState.targets.every((target) => Number.isFinite(target?.clock?.nowMs)) &&
+            Number.isSafeInteger(state.pinState.awarded) &&
+            state.pinState.awarded >= 0 &&
+            Number.isSafeInteger(state.pinState.rng) &&
+            Number.isSafeInteger(state.pinState.nextWaveAtMs) &&
             Array.isArray(state.impactPairs) &&
             state.impactPairs.every(
                 (pair) =>

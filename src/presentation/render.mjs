@@ -258,7 +258,7 @@ function pinShape(c, r) {
     c.quadraticCurveTo(0, r * 1.03, -r * 0.65, r * 0.91);
     c.closePath();
 }
-function pinBody(c, e, team) {
+function pinBody(c, e) {
     const r = e.r,
         k = e.kind || 'grunt',
         p = PIN_PALETTES[k] || PIN_PALETTES.grunt;
@@ -269,19 +269,6 @@ function pinBody(c, e, team) {
     c.clip();
     ellipse(c, r * 0.51, r * 0.1, r * 0.7, r * 1.15, p.shadow);
     ellipse(c, r * 0.32, -r * 2.25, r * 0.38, r * 0.65, p.shadow);
-    if (team) {
-        c.fillStyle = team.light;
-        c.fillRect(-r * 1.3, -r * 0.85, r * 2.6, r * 2);
-        line(
-            c,
-            [
-                { x: -r, y: -r * 0.85 },
-                { x: r, y: -r * 0.85 },
-            ],
-            team.ink,
-            2,
-        );
-    }
     ellipse(c, -r * 0.43, -r * 0.37, r * 0.23, r * 0.55, '#fffaf3');
     for (const h of [1.32, 1.65]) {
         c.beginPath();
@@ -407,28 +394,7 @@ const drawEnemy = (e) =>
     (e.z || 0) > 0 ||
     ((e.deadAge || 0) < 0.42 && Number.isFinite(e.deadAge)) ||
     (e.kind === 'bomb' && Number.isFinite(e.fuse) && !e.exploded);
-function pinTeamMarker(c, pin, team) {
-    const { x, y } = project(pin.x, pin.y);
-    const rx = (pin.r + 4) * CAMERA.scale;
-    const ry = rx * Math.sin(CAMERA.pitch);
-    if (team.shape === 'diamond') {
-        polygon(
-            c,
-            [
-                { x, y: y - ry },
-                { x: x + rx, y },
-                { x, y: y + ry },
-                { x: x - rx, y },
-            ],
-            team.ink,
-            team.light,
-            2.5,
-        );
-    } else {
-        ellipse(c, x, y, rx, ry, team.ink, team.light, 2.5);
-    }
-}
-function enemy(c, e, team) {
+function enemy(c, e) {
     const ground = project(e.x, e.y),
         r = e.r,
         z = e.z || 0,
@@ -478,7 +444,7 @@ function enemy(c, e, team) {
     c.translate(p.x, p.y);
     c.scale(CAMERA.scale, CAMERA.scale);
     c.rotate(angle);
-    pinBody(c, e, team);
+    pinBody(c, e);
     if (live && e.supported) ellipse(c, 0, r + 4, 3.2, 2, '#dfc4ee');
     c.restore();
     const head = project(e.x, e.y, z + r * 4);
@@ -1219,11 +1185,7 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
     for (const magnet of (g.pinMagnets || []).filter(seen)) magnetGround(c, magnet, g.time || 0);
     for (const e of enemies) enemyGround(c, e, g.boss);
     for (const s of liveShots) enemyShotGround(c, s, threatInk);
-    for (const e of enemies) {
-        const team = teamOf(e);
-        if (team && e.hp > 0) pinTeamMarker(c, e, team);
-        else if (drawEnemy(e)) shadow(c, e, e.r * 1.05);
-    }
+    for (const e of enemies) if (drawEnemy(e)) shadow(c, e, e.r * 1.05);
     if (bowlers) {
         for (const player of bowlers) {
             const b = player.boss;
@@ -1257,7 +1219,7 @@ export function render(c, g, aim = null, view = CAMERA_VIEW) {
                 teamOf(o),
             );
         } else if (type === 'reflector') drawReflector(c, o, { polygon, line });
-        else if (type === 'enemy') enemy(c, o, teamOf(o));
+        else if (type === 'enemy') enemy(c, o);
         else if (type === 'projectile') enemyShot(c, o, threatInk);
         else ball(c, o, teamOf(o));
     }
