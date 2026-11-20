@@ -95,3 +95,64 @@
     color: var(--duck-muted-ink);
     font-size: 13px;
 }
+
+.game-screen[data-mode] .round-hud {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
+    gap: 8px;
+}
+
+.game-screen[data-mode] .round-info {
+    grid-area: 1 / 2;
+    display: grid;
+    justify-items: center;
+    gap: 0;
+    min-width: 64px;
+    max-width: 145px;
+    text-align: center;
+    line-height: 1;
+}
+
+.game-screen[data-mode] .health-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: 750;
+    white-space: nowrap;
+}
+
+.game-screen[data-mode] #local-health {
+    grid-area: 1 / 1;
+}
+
+.game-screen[data-mode] #opponent-health {
+    grid-area: 1 / 3;
+    justify-self: end;
+    flex-direction: row-reverse;
+}
+
+.game-screen[data-mode] .life-pip {
+    border-color: var(--team-ink);
+}
+
+.game-screen[data-mode] .life-pip::after {
+    background: var(--team-fill);
+}
+
+.game-screen[data-mode] .health.critical .life-pip {
+    border-width: 2px;
+}
+
+@media (max-width: 310px) {
+    .game-screen[data-mode] .health-group {
+        flex-direction: column;
+        align-items: start;
+        gap: 1px;
+    }
+
+    .game-screen[data-mode] #opponent-health {
+        flex-direction: column;
+        align-items: end;
+    }
+}
