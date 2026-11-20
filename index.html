@@ -33,7 +33,7 @@
                     <p id="boot-status" role="status">게임을 불러오는 중…</p>
                     <a id="boot-retry" class="front-back" href="" hidden>다시 불러오기</a>
                     <small id="product-version" class="product-version" title="게임 버전"
-                        >0.8.0</small
+                        >0.8.1</small
                     >
                 </div>
             </section>
@@ -206,7 +206,19 @@
                         <strong id="round"></strong>
                         <span id="objective"></span>
                     </div>
-                    <div id="health" class="health" role="meter" aria-label="체력"></div>
+                    <div id="local-health" class="health-group">
+                        <span id="local-health-label" hidden>내 체력</span>
+                        <div id="health" class="health" role="meter" aria-label="체력"></div>
+                    </div>
+                    <div id="opponent-health" class="health-group" hidden>
+                        <span id="opponent-health-label">상대 체력</span>
+                        <div
+                            id="opponent-life"
+                            class="health"
+                            role="meter"
+                            aria-labelledby="opponent-health-label"
+                        ></div>
+                    </div>
                 </section>
                 <section class="arena">
                     <canvas
