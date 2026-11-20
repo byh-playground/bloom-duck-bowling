@@ -15,6 +15,7 @@ import {
 import { BowlingInput } from '../input/input.mjs';
 import { MovementInput } from '../input/movement-input.mjs';
 import { render, project, renderHomeDuck } from '../presentation/render.mjs';
+import { renderDuel } from '../presentation/duel-view.mjs';
 import { createBowlingAudio } from '../presentation/audio.mjs';
 import { DUCK_COMBAT } from '../domain/combat-clock.mjs';
 import { duckAimOpen, duckDashOpen } from '../domain/duck-recoil.mjs';
@@ -59,6 +60,8 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
     const menuButton = $('menu'),
         menuDialog = $('menu-dialog'),
         menuPanel = $('menu-panel');
+    const gameScreen = $('game-screen'),
+        gameControls = gameScreen.querySelector('.move-controls');
     const health = $('health'),
         lifePips = Array.from({ length: DUCK_COMBAT.hitsToDefeat }, () => {
             const pip = document.createElement('i');
@@ -107,31 +110,64 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         displayedShot,
         showcaseOpen = false,
         mutedBeforeShowcase = false;
+    let duel = null;
+    let campaignKeys;
+    let moveX = 0;
+    let moveY = 0;
     const inputMetrics = [];
+    const matchPlayer = (match = duel?.match) => match?.game.players[match.side] ?? game;
+    const canPlay = () => {
+        const match = duel?.match;
+        return (
+            !showcaseOpen &&
+            !menuPage &&
+            (match ? match.connected && !match.finished : game?.phase === 'playing')
+        );
+    };
+    function setDuelMove() {
+        const match = duel?.match;
+        const held = !aim && canPlay();
+        if (match) match.controller.setMove(held ? moveX : 0, held ? moveY : 0);
+    }
     const input = new BowlingInput(throwPad, {
         coordinateScale: 2,
         keyboardTarget: canvas,
-        getBalls: () => game?.balls ?? [],
-        getBoss: () => game?.boss,
-        enabled: () =>
-            !showcaseOpen &&
-            !menuPage &&
-            game?.phase === 'playing' &&
-            !game.boss.delivery &&
-            duckAimOpen(game.boss),
+        getBalls: () => matchPlayer()?.balls ?? [],
+        getBoss: () => matchPlayer()?.boss,
+        enabled: () => {
+            const boss = matchPlayer()?.boss;
+            return canPlay() && boss.hp > 0 && !boss.delivery && duckAimOpen(boss);
+        },
         project,
         onAim: (a) => {
             if (a) for (const m of inputMetrics) if (m.firstMovementMs === null) m.cancelled = true;
             aim = a;
             game?.setAim(a);
+            setDuelMove();
         },
-        onLaunch: (id, vx, vy, spin = 0) => game.launch(id, vx, vy, spin),
+        onLaunch: (id, vx, vy, spin = 0) => {
+            if (duel?.match) duel.match.controller.throw(vx, vy, spin);
+            else game.launch(id, vx, vy, spin);
+        },
     });
     const movement = new MovementInput({
         stick: $('move-stick'),
-        enabled: () => !showcaseOpen && !menuPage && game?.phase === 'playing',
-        onMove: (x, y) => game?.setMove(x, y),
+        enabled: canPlay,
+        onMove(x, y) {
+            moveX = x;
+            moveY = y;
+            game?.setMove(x, y);
+            setDuelMove();
+        },
         onDash: (event = {}) => {
+            const match = duel?.match;
+            if (match) {
+                const player = matchPlayer(match);
+                if (player.dashCharges <= 0 || !duckDashOpen(player.boss)) return false;
+                if (!match.controller.dash(moveX, moveY)) return false;
+                input.cancel();
+                return true;
+            }
             const at = performance.now(),
                 from = { x: game.boss.x, y: game.boss.y };
             if (!game.dash()) return false;
@@ -172,6 +208,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
     function clearInput() {
         movement.reset();
         input.cancel();
+        duel?.match?.controller.clearInput();
         loop.resetTiming();
     }
     function setScreen(screen) {
@@ -216,7 +253,15 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         showMenu(null);
         showMaps(unlockNotices);
     }
-    const duel = showcaseDemo ? null : installDuelUI();
+    if (!showcaseDemo) {
+        duel = installDuelUI({
+            onEnter: enterDuel,
+            onFrame: renderDuelFrame,
+            onStopInput: clearInput,
+            onResult: showDuelResult,
+            onExit: leaveDuel,
+        });
+    }
     const selectMode = bindTabs(document.querySelector('.start-tabs'), (tab) => {
         if (tab.id !== 'duel-tab') duel?.leaveLobby();
     });
@@ -236,7 +281,8 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
     function showMenu(page, focusLabel = null) {
         const wasOpen = menuPage !== null;
         menuPage = page;
-        audio?.setBackground(game ? (page ? 'paused' : 'playing') : 'home');
+        duel?.match?.controller.setPaused?.(Boolean(page));
+        audio?.setBackground(game || duel?.match ? (page ? 'paused' : 'playing') : 'home');
         if (page) {
             if (!wasOpen) clearInput();
             menuPanel.scrollTop = 0;
@@ -263,12 +309,15 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         if (menuPage) showMenu(menuPage.parent, menuPage.focusOnBack);
     }
     function openMenu() {
-        if (menuPage || !game || ['won', 'lost'].includes(game.phase)) return;
+        const match = duel?.match;
+        if (menuPage || (match ? match.finished : !game || ['won', 'lost'].includes(game.phase)))
+            return;
         const page = {
-            title: '일시정지',
+            title: match && !match.practice ? '대전 메뉴' : '일시정지',
             parent: null,
             render(o) {
                 const resume = button('계속하기', backFromMenu, 'primary');
+                if (match && !match.practice) o.append(message('p', '대전은 계속 진행돼요.'));
                 o.append(
                     resume,
                     button('설정', () => openSettings(page)),
@@ -332,6 +381,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         });
     }
     function confirmEndRun(parent) {
+        const isDuel = Boolean(duel?.match);
         showMenu({
             title: '이번 판을 끝낼까요?',
             parent,
@@ -339,9 +389,14 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
             render(o) {
                 const cancel = button('취소', backFromMenu, 'primary');
                 o.append(
-                    message('p', '지금 도전은 이어 할 수 없어요. 끝내면 맵 선택으로 돌아가요.'),
+                    message(
+                        'p',
+                        isDuel
+                            ? '경기를 끝내고 대전 선택으로 돌아가요.'
+                            : '지금 도전은 이어 할 수 없어요. 끝내면 맵 선택으로 돌아가요.',
+                    ),
                     cancel,
-                    button('끝내기', leaveRun, 'danger'),
+                    button('끝내기', isDuel ? duel.exit : leaveRun, 'danger'),
                 );
                 return cancel;
             },
@@ -441,7 +496,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
             !showcaseOpen &&
             document.hidden &&
             !menuPage &&
-            game?.phase === 'playing'
+            (game?.phase === 'playing' || (duel?.match?.practice && !duel.match.finished))
         )
             openMenu();
     });
@@ -566,6 +621,80 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         const next = String(value);
         if (el.textContent !== next) el.textContent = next;
     }
+    function clearDuelOverlay() {
+        const overlay = $('overlay');
+        overlay.hidden = true;
+        overlay.classList.remove('result-overlay');
+        overlay.replaceChildren();
+        canvas.inert = false;
+        gameControls.inert = false;
+        overlayKey = '';
+    }
+    function enterDuel() {
+        const match = duel.match;
+        clearInput();
+        clearDuelOverlay();
+        campaignKeys = { angle: input.keyAngle, power: input.keyPower };
+        input.keyAngle = match.side === 1 ? Math.PI / 2 : -Math.PI / 2;
+        input.keyPower = 0.7;
+        gameScreen.dataset.mode = match.practice ? 'practice' : 'duel';
+        gameScreen.dataset.side = String(match.side);
+        menuButton.hidden = false;
+        setScreen('game');
+        canvas.focus({ preventScroll: true });
+    }
+    function leaveDuel() {
+        clearInput();
+        clearDuelOverlay();
+        input.keyAngle = campaignKeys.angle;
+        input.keyPower = campaignKeys.power;
+        campaignKeys = undefined;
+        delete gameScreen.dataset.mode;
+        delete gameScreen.dataset.side;
+        delete gameScreen.dataset.tick;
+        delete gameScreen.dataset.confirmedTick;
+        showMenu(null);
+        setScreen('maps');
+    }
+    function showDuelResult(value) {
+        const match = duel.match;
+        if (menuPage) showMenu(null);
+        renderDuelFrame();
+        menuButton.hidden = true;
+        canvas.inert = true;
+        gameControls.inert = true;
+        const overlay = $('overlay');
+        const panel = message('div', '', 'popup-actions result-panel');
+        const title = value === 'draw' ? '무승부' : value === match.side ? '승리!' : '패배';
+        overlayTitle(panel, title);
+        const back = button('돌아가기', duel.exit, 'primary');
+        panel.append(back);
+        overlay.replaceChildren(panel);
+        overlay.classList.add('result-overlay');
+        overlay.hidden = false;
+        back.focus({ preventScroll: true });
+    }
+    function renderDuelFrame() {
+        const match = duel.match;
+        const { game: matchGame, side, finished, practice, status, confirmedTick } = match;
+        const local = matchPlayer(match);
+        const remote = matchGame.players[1 - side].boss;
+        const ready = local.balls.filter((ball) => ball.ready).length;
+        if ((!canPlay() || !duckAimOpen(local.boss)) && (aim || input.id !== null)) input.cancel();
+        movement.refresh();
+        const count = `${remote.hp / DUCK_COMBAT.damagePerHit}/${remote.maxHp / DUCK_COMBAT.damagePerHit}`;
+        setText($('round'), practice ? 'AI 연습' : '1대1 대전');
+        setText(
+            $('objective'),
+            status || `${practice ? 'AI' : '상대'} 체력 ${count} · 처치 ${local.kills}`,
+        );
+        updateHealth(local.boss.hp);
+        updateControls({ ready, nextBallType: ready ? local.selectedType : null }, local);
+        renderDuel(ctx, matchGame, side, aim ? { ...aim, detached: true } : null);
+        paintThrowPad(local, ready, !finished && (!match.connected || Boolean(menuPage)));
+        gameScreen.dataset.tick = String(matchGame.tick);
+        gameScreen.dataset.confirmedTick = String(confirmedTick);
+    }
     function updateRound(s) {
         const trail = game.expedition;
         setText(
@@ -586,8 +715,11 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
                 needs.push('보스 핀');
         }
         setText($('objective'), needs.join(' · '));
-        health.setAttribute('aria-valuenow', String(Math.ceil(s.hp)));
-        const remaining = s.hp / DUCK_COMBAT.damagePerHit;
+        updateHealth(s.hp);
+    }
+    function updateHealth(hp) {
+        health.setAttribute('aria-valuenow', String(Math.ceil(hp)));
+        const remaining = hp / DUCK_COMBAT.damagePerHit;
         health.classList.toggle('critical', remaining <= 1);
         lifePips.forEach((pip, i) =>
             pip.style.setProperty(
@@ -596,7 +728,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
             ),
         );
     }
-    function updateControls(s) {
+    function updateControls(s, player) {
         const type = s.nextBallType ?? (s.ready > 0 ? displayedShot : null);
         if (type !== displayedShot) {
             displayedShot = type;
@@ -606,15 +738,19 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
             setText($('shot-kind'), name);
             setText($('shot-trait'), trait);
         }
-        const picked = game.lastPickup && game.time - game.lastPickup.time < 1.1;
-        setText($('ammo-count'), `${s.ready}/${game.balls.length}`);
+        const picked = player.lastPickup && player.time - player.lastPickup.time < 1.1;
+        setText($('ammo-count'), `${s.ready}/${player.balls.length}`);
         $('ammo').classList.toggle('picked', !!picked);
-        const inactive = menuPage !== null || s.phase !== 'playing',
-            landing = !duckAimOpen(game.boss);
+        const inactive = !canPlay(),
+            landing = !duckAimOpen(player.boss);
         $('move-stick').classList.toggle('armed', !!movement.dashArmed);
-        $('move-stick').classList.toggle('dashing', game.boss.dashRemaining > 0);
+        $('move-stick').classList.toggle('dashing', player.boss.dashRemaining > 0);
         $('move-stick').setAttribute('aria-disabled', String(inactive));
-        const { dashCharges: charges, dashCapacity: capacity, dashRechargeProgress: progress } = s;
+        const {
+            dashCharges: charges,
+            dashCapacity: capacity,
+            dashRechargeProgress: progress,
+        } = player;
         $('dash-charges').setAttribute('aria-label', `대시 ${charges}/${capacity}회 준비`);
         for (let i = 0; i < capacity; i++) {
             const chip = $('dash-charge-' + i),
@@ -626,7 +762,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
                 `${(full ? 1 : i === charges ? progress : 0) * 100}%`,
             );
         }
-        const delivering = !!game.boss.delivery;
+        const delivering = !!player.boss.delivery;
         throwPad.setAttribute(
             'aria-disabled',
             String(inactive || delivering || landing || s.ready === 0),
@@ -647,6 +783,10 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         );
     }
     function update() {
+        if (duel?.match) {
+            renderDuelFrame();
+            return;
+        }
         movement.refresh();
         const summary = $('summary');
         if (!game) {
@@ -659,7 +799,7 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
             input.cancel();
         const s = game.snapshot();
         updateRound(s);
-        updateControls(s);
+        updateControls(s, game);
         menuButton.hidden = s.phase === 'won' || s.phase === 'lost';
         showOverlay();
         summary.dataset.state = JSON.stringify(s);
@@ -726,6 +866,10 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
             update();
             return;
         }
+        paintThrowPad(game, game.balls.filter((b) => b.ready).length);
+        update();
+    }
+    function paintThrowPad(player, ready, paused = false) {
         const box = throwPad.getBoundingClientRect(),
             pw = Math.max(1, Math.round(box.width * 2)),
             ph = Math.max(1, Math.round(box.height * 2));
@@ -736,14 +880,14 @@ export function startBowling({ beforeStep = null, stepRate = 1, seed, showcaseDe
         renderThrowPad(throwCtx, aim, {
             width: pw,
             height: ph,
-            available: !menuPage && game?.phase === 'playing',
-            airborne: !duckAimOpen(game.boss),
-            doubleArmed: game.doubleArmed,
-            delivering: game.boss.delivery?.phase,
-            ready: game.balls.filter((b) => b.ready).length,
+            available: Boolean(canPlay()),
+            paused,
+            airborne: !duckAimOpen(player.boss),
+            doubleArmed: player.doubleArmed,
+            delivering: player.boss.delivery?.phase,
+            ready,
             keyboard: !!aim && input.id === null,
         });
-        update();
     }
     update();
     return {

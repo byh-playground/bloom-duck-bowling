@@ -1,10 +1,3 @@
-import { BowlingInput } from '../input/input.mjs';
-import { MovementInput } from '../input/movement-input.mjs';
-import { DUCK_COMBAT } from '../domain/combat-clock.mjs';
-import { BALL_TYPES } from '../domain/dynamics.mjs';
-import { duckAimOpen } from '../domain/duck-recoil.mjs';
-import { renderDuel } from '../presentation/duel-view.mjs';
-import { renderThrowPad } from '../presentation/throw-pad.mjs';
 import { openPracticeDuel } from './duel-practice.mjs';
 
 const STATUS = {
@@ -33,166 +26,43 @@ function setText(node, value) {
     if (node.textContent !== next) node.textContent = next;
 }
 
-const healthCells = ({ hp, maxHp }) => {
-    const pip = DUCK_COMBAT.damagePerHit;
-    return Math.max(0, hp) / pip + ' / ' + maxHp / pip;
-};
-
-export function installDuelUI() {
+export function installDuelUI({ onEnter, onFrame, onStopInput, onResult, onExit }) {
     const $ = (id) => document.getElementById(id);
-    const dialog = $('duel-dialog');
     const picker = $('duel-picker');
     const pickerStatus = $('duel-picker-status');
     const friend = $('duel-friend');
     const practice = $('duel-practice');
     const lobby = $('duel-lobby');
-    const match = $('duel-match');
     const host = $('duel-host');
     const join = $('duel-join');
     const code = $('duel-code');
     const room = $('duel-room');
     const copy = $('duel-copy');
-    const status = $('duel-status');
     const lobbyStatus = $('duel-lobby-status');
-    const canvas = $('duel-game');
-    const pad = $('duel-throw');
-    const stick = $('duel-stick');
-    const controls = dialog.querySelector('.duel-controls');
-    const result = $('duel-result');
-    const ctx = canvas.getContext('2d');
-    const padCtx = pad.getContext('2d');
-    const localHp = $('duel-local-hp');
-    const remoteHp = $('duel-remote-hp');
-    const kills = $('duel-kills');
-    const ammo = $('duel-ammo');
     let active = null;
-    let aim = null;
-    let moveX = 0;
-    let moveY = 0;
-
-    const player = () => active?.game?.players[active.side];
-    const canPlay = () => !!(dialog.open && active?.connected && active.game && !active.finished);
-    const canThrow = () => {
-        const local = player();
-        return (
-            canPlay() &&
-            local?.boss.hp > 0 &&
-            !local.boss.delivery &&
-            duckAimOpen(local.boss) &&
-            local.balls.some((ball) => ball.ready && ball.held)
-        );
-    };
-
-    const throwInput = new BowlingInput(pad, {
-        keyboardTarget: canvas,
-        coordinateScale: 2,
-        getBoss: () => player()?.boss,
-        getBalls: () => player()?.balls ?? [],
-        enabled: canThrow,
-        onAim(value) {
-            aim = value;
-        },
-        onLaunch(id, vx, vy, spin) {
-            if (canThrow()) active.controller.throw(vx, vy, spin);
-        },
-    });
-    const movement = new MovementInput({
-        stick,
-        enabled: canPlay,
-        onMove(x, y) {
-            moveX = x;
-            moveY = y;
-            if (canPlay()) active.controller.setMove(x, y);
-        },
-        onDash() {
-            if (!canPlay()) return false;
-            throwInput.cancel();
-            active.controller.dash(moveX, moveY);
-            return true;
-        },
-    });
-
-    function renderFrame({ game, side, confirmedTick }) {
-        const first = active.game === null;
-        active.game = game;
-        active.side = side;
-        if (first) {
-            match.hidden = false;
-            if (!dialog.open) dialog.showModal();
-            throwInput.keyAngle = side === 1 ? Math.PI / 2 : -Math.PI / 2;
-            canvas.focus({ preventScroll: true });
-            setText(status, active.practice ? '연습 중' : '대전 중');
-        }
-
-        const local = game.players[side];
-        const opponent = game.players[1 - side];
-        if (aim && !canThrow()) throwInput.cancel();
-        renderDuel(ctx, game, side, aim ? { ...aim, detached: true } : null);
-        const ready = local.balls.filter((ball) => ball.ready).length;
-        setText(localHp, healthCells(local.boss));
-        setText(remoteHp, healthCells(opponent.boss));
-        setText(kills, '처치 ' + local.kills);
-        const type = BALL_TYPES[local.selectedType];
-        const ballName = type && ready > 0 ? type.name + ' 공 · ' : '';
-        setText(ammo, ballName + ready + ' / ' + local.balls.length);
-        match.dataset.confirmedTick = String(confirmedTick);
-        match.dataset.tick = String(game.tick);
-        match.dataset.side = String(side);
-
-        const { width, height } = pad.getBoundingClientRect();
-        const w = Math.max(1, Math.round(width * 2));
-        const h = Math.max(1, Math.round(height * 2));
-        if (pad.width !== w) pad.width = w;
-        if (pad.height !== h) pad.height = h;
-        const available = canPlay();
-        updateInputAvailability();
-        renderThrowPad(padCtx, aim, {
-            width: w,
-            height: h,
-            available,
-            paused: !available && !active.finished,
-            airborne: !duckAimOpen(local.boss),
-            delivering: local.boss.delivery?.phase,
-            ready,
-            keyboard: !!aim && throwInput.id === null,
-        });
-    }
-
-    function updateInputAvailability() {
-        pad.setAttribute('aria-disabled', String(!canThrow()));
-        stick.setAttribute('aria-disabled', String(!canPlay()));
-    }
 
     function setLobbyEnabled(enabled) {
         host.disabled = !enabled;
         for (const field of join.elements) field.disabled = !enabled;
     }
 
-    function clearInput() {
-        movement.reset();
-        throwInput.cancel();
-        active?.controller?.setMove(0, 0);
-    }
-
     function resetMatch() {
         const previous = active;
-        clearInput();
         active = null;
         previous?.abort.abort();
         previous?.controller?.close();
-        match.hidden = true;
-        result.hidden = true;
-        canvas.inert = false;
-        controls.inert = false;
         room.hidden = true;
         copy.hidden = true;
         room.textContent = '';
-        delete match.dataset.confirmedTick;
-        delete match.dataset.tick;
-        delete match.dataset.side;
         setLobbyEnabled(true);
-        setText(status, '');
         setText(lobbyStatus, '');
+    }
+
+    function exit() {
+        const returnTo = active?.practice ? practice : host;
+        resetMatch();
+        onExit();
+        returnTo.focus({ preventScroll: true });
     }
 
     function leaveLobby() {
@@ -213,11 +83,9 @@ export function installDuelUI() {
             side: role === 'join' ? 1 : 0,
             finished: false,
             practice: isPractice,
+            status: '',
         };
         active = attempt;
-        throwInput.keyPower = 0.7;
-        setText($('duel-title'), isPractice ? 'AI 연습' : '친구와 대전');
-        setText($('duel-opponent'), isPractice ? 'AI' : '상대');
         if (!isPractice) {
             setLobbyEnabled(false);
             setText(lobbyStatus, role === 'host' ? '방을 만들고 있어요.' : '방에 참가하고 있어요.');
@@ -246,45 +114,41 @@ export function installDuelUI() {
                     }
                     if (isPractice && value === 'failed')
                         console.error('Duck Bowling practice stopped', error);
-                    const statusNode = attempt.game ? status : lobbyStatus;
                     const state = typeof value === 'string' ? value : value?.state;
                     if (state === 'running' || state === 'ready' || state === 'playing') {
                         attempt.connected = true;
-                        if (!isPractice)
-                            setText(statusNode, attempt.game ? '대전 중' : STATUS.open);
+                        attempt.status = '';
+                        if (!attempt.game) setText(lobbyStatus, STATUS.open);
                     } else if (Object.hasOwn(STATUS, state)) {
-                        clearInput();
                         attempt.connected = false;
-                        setText(
-                            statusNode,
-                            isPractice ? '연습 경기를 계속할 수 없어요.' : STATUS[state],
-                        );
+                        attempt.status = isPractice
+                            ? '연습 경기를 계속할 수 없어요.'
+                            : STATUS[state];
+                        if (attempt.game) {
+                            onStopInput();
+                            onFrame();
+                        } else setText(lobbyStatus, attempt.status);
                     }
                 },
-                onFrame(frame) {
-                    if (active === attempt) renderFrame(frame);
+                onFrame({ game, side, confirmedTick }) {
+                    if (active !== attempt) return;
+                    const first = attempt.game === null;
+                    attempt.game = game;
+                    attempt.side = side;
+                    attempt.confirmedTick = confirmedTick;
+                    if (first) onEnter();
+                    onFrame();
                 },
                 onResult(value) {
                     if (active !== attempt || attempt.finished) return;
-                    clearInput();
                     attempt.finished = true;
-                    canvas.inert = true;
-                    controls.inert = true;
-                    updateInputAvailability();
-                    padCtx.clearRect(0, 0, pad.width, pad.height);
-                    setText(
-                        $('duel-result-message'),
-                        value === 'draw' ? '무승부' : value === attempt.side ? '승리!' : '패배',
-                    );
-                    setText(status, '경기 종료');
-                    result.hidden = false;
-                    $('duel-exit-match').focus({ preventScroll: true });
+                    onStopInput();
+                    onResult(value);
                 },
             });
             void attempt.controller.opened.then(() => {
                 if (active !== attempt) return;
                 attempt.connected = true;
-                if (attempt.game) canvas.focus({ preventScroll: true });
             }, failed);
         } catch (error) {
             failed(error);
@@ -322,13 +186,6 @@ export function installDuelUI() {
         event.preventDefault();
         backToPicker();
     });
-    $('duel-close').addEventListener('click', () => dialog.close());
-    $('duel-exit-match').addEventListener('click', () => dialog.close());
-    dialog.addEventListener('close', () => {
-        const returnTo = active?.practice ? practice : host;
-        resetMatch();
-        returnTo.focus({ preventScroll: true });
-    });
     host.addEventListener('click', () => start('host'));
     join.addEventListener('submit', (event) => {
         event.preventDefault();
@@ -344,17 +201,23 @@ export function installDuelUI() {
         const attempt = active;
         try {
             await navigator.clipboard.writeText(room.textContent);
-            if (active === attempt && match.hidden && !lobby.hidden)
+            if (active === attempt && !attempt?.game && !lobby.hidden)
                 setText(lobbyStatus, '방 코드를 복사했어요. 친구가 참가하면 시작합니다.');
         } catch {
-            if (active === attempt && match.hidden && !lobby.hidden)
+            if (active === attempt && !attempt?.game && !lobby.hidden)
                 setText(lobbyStatus, '화면에 표시된 방 코드를 친구에게 알려주세요.');
         }
     });
     window.addEventListener('pagehide', () => {
-        if (dialog.open) dialog.close();
-        leaveLobby();
+        if (active?.game) exit();
+        else leaveLobby();
     });
     $('duel-tab').hidden = false;
-    return { leaveLobby };
+    return {
+        get match() {
+            return active?.game ? active : null;
+        },
+        exit,
+        leaveLobby,
+    };
 }

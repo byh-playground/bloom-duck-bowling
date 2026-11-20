@@ -94,8 +94,7 @@ class DuelPlayer extends BowlingGame {
         }
         if (
             this.dashCharges > 0 &&
-            !(this.boss.dashRemaining > 0) &&
-            !this.boss.delivery &&
+            (action?.dash || (!(this.boss.dashRemaining > 0) && !this.boss.delivery)) &&
             duckDashOpen(this.boss)
         )
             this.dash();

@@ -11,6 +11,7 @@ export function openPracticeDuel({ onFrame, onResult, onStatus }) {
     let move = { moveX: 0, moveY: 0 };
     let dash = null;
     let shot = null;
+    let paused = false;
     function clearInput() {
         move = { moveX: 0, moveY: 0 };
         dash = null;
@@ -23,14 +24,14 @@ export function openPracticeDuel({ onFrame, onResult, onStatus }) {
             poll() {},
             releaseInput: clearInput,
             advance() {
-                game.step([{ ...(dash ?? move), shot }, bot(game, 1)]);
+                game.step([{ ...(dash ?? move), dash: dash !== null, shot }, bot(game, 1)]);
                 dash = null;
                 shot = null;
                 return advanced;
             },
         },
         getInput: () => idle,
-        canAdvance: () => !document.hidden && game.result === null,
+        canAdvance: () => !paused && !document.hidden && game.result === null,
         onInputRelease: clearInput,
         onError(error) {
             loop.stop();
@@ -51,11 +52,19 @@ export function openPracticeDuel({ onFrame, onResult, onStatus }) {
             clearInput();
             loop.stop();
         },
+        clearInput,
+        setPaused(value) {
+            paused = value;
+            if (paused) clearInput();
+            loop.resetTiming();
+        },
         setMove(x, y) {
             move = { moveX: x, moveY: y };
         },
         dash(x, y) {
-            dash ??= { moveX: x, moveY: y };
+            if (dash || (!x && !y)) return false;
+            dash = { moveX: x, moveY: y };
+            return true;
         },
         throw(vx, vy, spin) {
             shot ??= { vx, vy, spin };
