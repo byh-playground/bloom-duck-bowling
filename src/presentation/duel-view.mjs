@@ -1,8 +1,8 @@
 import { render } from './render.mjs';
 
 export const DUEL_TEAMS = Object.freeze({
-    local: Object.freeze({ ink: '#07544a', light: '#66f2c6', shape: 'circle' }),
-    opponent: Object.freeze({ ink: '#7d331a', light: '#ff904b', shape: 'diamond' }),
+    local: Object.freeze({ ink: '#07544a', light: '#66f2c6' }),
+    opponent: Object.freeze({ ink: '#7d331a', light: '#ff904b' }),
 });
 const teamsBySide = [
     [DUEL_TEAMS.local, DUEL_TEAMS.opponent],
