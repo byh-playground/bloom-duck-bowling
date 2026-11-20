@@ -161,3 +161,131 @@
 .duel-score progress::-moz-progress-bar {
     background: var(--team-fill);
 }
+
+.game-screen[data-mode] .arena {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+    isolation: isolate;
+}
+
+.game-screen[data-mode] .court-local,
+.court-opponent {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    min-height: 0;
+    container-type: size;
+    overflow: hidden;
+    border-radius: 12px;
+}
+
+.court-opponent {
+    position: absolute;
+    z-index: 1;
+    top: 8px;
+    right: 8px;
+    width: min(27%, 114px);
+    aspect-ratio: 640 / 720;
+    border: 1px solid #e9ae81;
+    background: #344653;
+    box-shadow: 0 2px 9px #2034416e;
+    pointer-events: none;
+}
+
+#opponent-game {
+    display: block;
+    width: min(100cqw, calc(100cqh * 640 / 720));
+    height: min(100cqh, calc(100cqw * 720 / 640));
+}
+
+.court-label,
+.duel-transfer {
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: calc(100% - 8px);
+    padding: 3px 6px;
+    border-radius: 5px;
+    color: #fff0d8;
+    background: #252e36ed;
+    font-size: 11px;
+    font-weight: 800;
+    text-align: center;
+    pointer-events: none;
+}
+
+.court-local .duel-transfer {
+    top: 8px;
+    left: 8px;
+    transform: none;
+}
+
+.court-opponent .duel-transfer {
+    inset: auto auto 5px 50%;
+    font-size: clamp(9px, 2.8vw, 12px);
+}
+
+.duel-transfer[data-phase='queued'] {
+    outline: 1px solid #f1c381;
+}
+
+.duel-transfer[data-phase='arrived'] {
+    color: #382415;
+    background: #ffce91;
+    animation: duel-arrival 360ms ease-out;
+}
+
+@keyframes duel-arrival {
+    from {
+        opacity: 0.3;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@media (min-width: 740px) {
+    main:has(.game-screen[data-mode]:not([hidden])) {
+        max-width: 1120px;
+    }
+
+    .game-screen[data-mode] .arena {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        background: transparent;
+    }
+
+    .game-screen[data-mode] .court-local,
+    .court-opponent {
+        background: var(--duck-arena);
+    }
+
+    .court-opponent {
+        position: relative;
+        inset: auto;
+        width: auto;
+        aspect-ratio: auto;
+        border-color: #aa825c;
+        box-shadow: none;
+    }
+
+    .court-opponent .duel-transfer {
+        bottom: 8px;
+    }
+
+    .game-screen[data-mode] .move-controls {
+        width: min(100%, 634px);
+        align-self: center;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .duel-transfer[data-phase='arrived'] {
+        animation: none;
+    }
+}

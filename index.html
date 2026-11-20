@@ -33,7 +33,7 @@
                     <p id="boot-status" role="status">게임을 불러오는 중…</p>
                     <a id="boot-retry" class="front-back" href="" hidden>다시 불러오기</a>
                     <small id="product-version" class="product-version" title="게임 버전"
-                        >0.11.0</small
+                        >0.12.0</small
                     >
                 </div>
             </section>
@@ -228,13 +228,26 @@
                     </div>
                 </section>
                 <section class="arena">
-                    <canvas
-                        id="game"
-                        tabindex="0"
-                        width="640"
-                        height="720"
-                        aria-label="덕 볼링 경기장"
-                    ></canvas>
+                    <div class="court-local">
+                        <canvas
+                            id="game"
+                            tabindex="0"
+                            width="640"
+                            height="720"
+                            aria-label="덕 볼링 경기장"
+                        ></canvas>
+                        <div id="duel-incoming" class="duel-transfer" role="status" hidden></div>
+                    </div>
+                    <div id="opponent-court" class="court-opponent" hidden>
+                        <canvas
+                            id="opponent-game"
+                            width="640"
+                            height="720"
+                            aria-label="상대 코트"
+                        ></canvas>
+                        <span id="opponent-court-label" class="court-label">상대 코트</span>
+                        <div id="duel-outgoing" class="duel-transfer" role="status" hidden></div>
+                    </div>
                     <div
                         id="overlay"
                         class="popup-actions"

@@ -10,11 +10,9 @@ const PRACTICE = Object.freeze({
     firstShotMs: 1250,
     shotIntervalMs: 2000,
     repositionMs: 1750,
-    dodgeIntervalMs: 2000,
     shotSpeed: 850,
     aimError: 40,
     defendDistance: 200,
-    dodgeLookaheadMs: 250,
 });
 
 const IDLE = Object.freeze({ moveX: 0, moveY: 0 });
@@ -22,32 +20,15 @@ const DASH_REACH = MANUAL.burstSpeed * MANUAL.burstDuration;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const distanceTo = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
-function nearestPin(pins, duck) {
+function nearestPin(pins, court, duck) {
     let nearest = null;
     let distance = Infinity;
     for (const pin of pins) {
-        if (pin.hp <= 0 || pin.z > 60) continue;
+        if (pin.court !== court || pin.hp <= 0 || pin.z > 60) continue;
         const candidateDistance = distanceTo(duck, pin);
         if (candidateDistance >= distance) continue;
         nearest = pin;
         distance = candidateDistance;
-    }
-    return nearest;
-}
-
-function incomingPosition(duck, balls) {
-    let nearest = null;
-    let soonest = PRACTICE.dodgeLookaheadMs / 1000;
-    for (const ball of balls) {
-        const speedSquared = ball.vx ** 2 + ball.vy ** 2;
-        if (!ball.inWorld || ball.life <= 0 || speedSquared === 0) continue;
-        const time = ((duck.x - ball.x) * ball.vx + (duck.y - ball.y) * ball.vy) / speedSquared;
-        if (time <= 0 || time >= soonest) continue;
-        const x = ball.x + ball.vx * time;
-        const y = ball.y + ball.vy * time;
-        if (Math.hypot(x - duck.x, y - duck.y) > ball.r + duck.r) continue;
-        nearest = { x, y };
-        soonest = time;
     }
     return nearest;
 }
@@ -109,40 +90,24 @@ export function createDuelBot() {
     let nextDecisionMs = 0;
     let nextShotMs = PRACTICE.firstShotMs;
     let nextRepositionMs = 0;
-    let nextDodgeMs = 0;
     let randomSeed;
 
     return (game, side) => {
         const player = game.players[side];
-        const opponent = game.players[1 - side];
         const duck = player.boss;
         const nowMs = game.clock.nowMs;
         if (nowMs < nextDecisionMs || duck.hp <= 0 || duck.delivery || duck.dashRemaining > 0)
             return IDLE;
         nextDecisionMs = nowMs + PRACTICE.reactionMs;
 
-        const targetPin = nearestPin(game.pins, duck);
+        const targetPin = nearestPin(game.pins, side, duck);
         const canDash = player.dashCharges > 0 && duckDashOpen(duck);
         const canShoot = duckAimOpen(duck) && player.balls.some((ball) => ball.ready && ball.held);
-        const incoming = canDash && nowMs >= nextDodgeMs && incomingPosition(duck, opponent.balls);
-        if (incoming) {
-            const direction = Math.sign(duck.x - incoming.x) || 1;
-            const dodge = safeDash(player, duck.x + direction * DASH_REACH, duck.y, incoming);
-            if (dodge) {
-                nextDodgeMs = nowMs + PRACTICE.dodgeIntervalMs;
-                return dodge;
-            }
-        }
-
-        if (canShoot && nowMs >= nextShotMs) {
+        if (canShoot && targetPin && nowMs >= nextShotMs) {
             const draw = nextRandom(randomSeed ?? game.seed ^ side);
             randomSeed = draw.seed;
             nextShotMs = nowMs + PRACTICE.shotIntervalMs;
-            return aimedShot(
-                player,
-                targetPin ?? opponent.boss,
-                (draw.value - 0.5) * PRACTICE.aimError,
-            );
+            return aimedShot(player, targetPin, (draw.value - 0.5) * PRACTICE.aimError);
         }
 
         if (canDash && nowMs >= nextRepositionMs) {
@@ -158,7 +123,7 @@ export function createDuelBot() {
             }
             const bounds = player.duckBounds;
             const targetY = (bounds.minY + bounds.maxY) / 2;
-            const targetX = clamp(opponent.boss.x, bounds.minX, bounds.maxX);
+            const targetX = clamp(targetPin?.x ?? player.arena.centerX, bounds.minX, bounds.maxX);
             if (distanceTo(duck, { x: targetX, y: targetY }) > DASH_REACH * 0.75)
                 return safeDash(player, targetX, targetY) ?? IDLE;
         }

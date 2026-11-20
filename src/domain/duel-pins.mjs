@@ -37,7 +37,9 @@ export function createDuelPinState(seed) {
     return {
         targets: [createTarget(), createTarget()],
         rng: (seed ^ 0x517cc1b7) >>> 0,
+        bonusRng: (seed ^ 0x63d83595) >>> 0,
         awarded: [0, 0],
+        lastBonus: [null, null],
         nextWaveAtMs: 0,
         waves: 0,
         nextPinId: 1,
@@ -57,11 +59,11 @@ function drawSpecial(state) {
     throw new Error('Invalid duel special pin draw');
 }
 
-function makePin(game, kind, x, y, facing) {
+function makePin(game, court, kind, x, y, facing) {
     const u = configureEnemy(
         {
             id: game.pinState.nextPinId++,
-            targetSide: null,
+            court,
             expiresAtMs: game.clock.nowMs + PIN_LIFETIME_MS,
             x,
             y,
@@ -90,20 +92,37 @@ function makePin(game, kind, x, y, facing) {
 
 function spawnWave(game) {
     const state = game.pinState;
-    const draw = { rng: state.rng };
-    const specials = [[drawSpecial(draw)], [drawSpecial(draw)]];
+    const baselineDraw = { rng: state.rng };
+    const bonusDraw = { rng: state.bonusRng };
+    const sharedSpecial = drawSpecial(baselineDraw);
+    const specials = [[sharedSpecial], [sharedSpecial]];
     const earned = game.players.map(({ score }) => Math.floor(score / DUEL_SPECIAL_KILLS));
     for (const { side } of game.players) {
         for (let i = state.awarded[side]; i < earned[side]; i++) {
-            specials[1 - side].push(drawSpecial(draw));
+            specials[1 - side].push(drawSpecial(bonusDraw));
         }
     }
     const rosters = specials.map((kinds, side) => planDuelSpawn(game, side, kinds));
     if (rosters.some((roster) => !roster)) return;
-    for (const roster of rosters) {
-        for (const { kind, x, y, facing } of roster) makePin(game, kind, x, y, facing);
+    for (const [court, roster] of rosters.entries()) {
+        const count = specials[court].length - 1;
+        if (count > 0) state.lastBonus[court] = { tick: game.tick + 1, count };
+        const bonusStart = roster.length - count;
+        for (const [index, { kind, x, y, facing }] of roster.entries()) {
+            makePin(game, court, kind, x, y, facing);
+            if (index >= bonusStart)
+                game.fxOnCourt(
+                    court,
+                    'special-drop',
+                    x,
+                    y,
+                    0,
+                    Math.max(24, ENEMY_TYPES[kind].r * 1.5),
+                );
+        }
     }
-    state.rng = draw.rng;
+    state.rng = baselineDraw.rng;
+    state.bonusRng = bonusDraw.rng;
     state.awarded = earned;
     state.waves++;
     state.nextWaveAtMs = game.clock.nowMs + DUEL_WAVE_MS;
@@ -115,6 +134,8 @@ export function hurtDuelPin(
     { damage, vx = 0, vy = 0, vz = 0, stun = 0, playerIndex, depth },
 ) {
     if (pin.hp <= 0 || !Number.isFinite(damage) || damage <= 0) return false;
+    if (playerIndex !== undefined && (playerIndex !== pin.court || !game.players[playerIndex]))
+        return false;
 
     pin.hp = Math.max(0, pin.hp - damage);
     pin.vx += vx;
@@ -137,27 +158,15 @@ export function hurtDuelPin(
     pin.scoreCause = playerIndex ?? null;
     pin.chainDepth = depth ?? 0;
     ignite(pin);
-    game.fx('hit', pin.x, pin.y, pin.z + 12, 16, '#ffe6a6');
+    game.fxOnCourt(pin.court, 'hit', pin.x, pin.y, pin.z + 12, 16, '#ffe6a6');
     if (pin.hp === 0) {
         if (playerIndex !== undefined) game.players[playerIndex].score++;
-        game.fx('ko', pin.x, pin.y, pin.z + 20, 16, '#f4ba77');
+        game.fxOnCourt(pin.court, 'ko', pin.x, pin.y, pin.z + 20, 16, '#f4ba77');
     }
     return true;
 }
 
-function targetFor(pin, ducks) {
-    const committed =
-        pin.pinBlast || pin.projectileWarning || (pin.giantStage && pin.giantStage !== 'approach');
-    if (committed && pin.targetSide !== null) return pin.targetSide;
-    const [host, guest] = ducks;
-    const hostDistance = (host.x - pin.x) ** 2 + (host.y - pin.y) ** 2;
-    const guestDistance = (guest.x - pin.x) ** 2 + (guest.y - pin.y) ** 2;
-    if (hostDistance === guestDistance) return pin.targetSide ?? pin.id % 2;
-    return hostDistance < guestDistance ? 0 : 1;
-}
-
-function movePin(pin, game, dt) {
-    const a = game.arena;
+function movePin(pin, a, dt) {
     const x = pin.x + pin.vx * dt;
     const y = pin.y + pin.vy * dt;
     pin.x = clamp(x, a.left + pin.r, a.right - pin.r);
@@ -167,7 +176,7 @@ function movePin(pin, game, dt) {
     resolveReflectors(pin, a.reflectors, pin.z);
 }
 
-function airborne(pin, game, dt) {
+function airborne(pin, world, dt) {
     pin.vz -= BODY_GRAVITY * dt;
     pin.z += pin.vz * dt;
     pin.angle += pin.spin * dt;
@@ -182,16 +191,16 @@ function airborne(pin, game, dt) {
         pin.projectileHop = false;
         pin.stun = Math.max(pin.stun, 0.18);
         pin.spin *= 0.3;
-        game.fx('land', pin.x, pin.y, 0, 15, '#c6d6a1');
+        world.fx('land', pin.x, pin.y, 0, 15, '#c6d6a1');
     }
 }
 
-function stepPin(pin, game, world, dt) {
+function stepPin(pin, world, dt) {
     pin.flash = Math.max(0, pin.flash - dt);
     pin.stun = Math.max(0, pin.stun - dt);
     if (pin.hp <= 0) pin.deadAge += dt;
     if (pin.z > 0 || pin.vz > 0) {
-        airborne(pin, game, dt);
+        airborne(pin, world, dt);
     } else if (pin.hp <= 0 || pin.stun > 0) {
         const scale = Math.exp(-BODY_DRAG * dt);
         pin.vx *= scale;
@@ -232,18 +241,18 @@ function stepPin(pin, game, world, dt) {
         }
         pin.angle *= Math.exp(-9 * dt);
     }
-    movePin(pin, game, dt);
+    movePin(pin, world.arena, dt);
 }
 
-function explodeBomb(pin, game, dt) {
+function explodeBomb(pin, game, world, dt) {
     if (pin.fuse === null || pin.exploded) return;
     pin.fuse -= dt;
     if (pin.fuse > 0) return;
     pin.exploded = true;
     pin.fuse = 0;
     pin.hp = 0;
-    game.fx('stomp', pin.x, pin.y, pin.z, BOMB_RADIUS, '#ffae6f');
-    for (const enemy of game.pins) {
+    world.fx('stomp', pin.x, pin.y, pin.z, BOMB_RADIUS, '#ffae6f');
+    for (const enemy of world.enemies) {
         if (enemy.hp <= 0 || Math.abs(enemy.z - pin.z) > 45) continue;
         const dx = enemy.x - pin.x;
         const dy = enemy.y - pin.y;
@@ -258,26 +267,24 @@ function explodeBomb(pin, game, dt) {
             stun: 0.28,
         });
     }
-    if (pin.z >= 40) return;
-    for (const { boss: duck, side } of game.players) {
-        if (Math.hypot(duck.x - pin.x, duck.y - pin.y) < BOMB_RADIUS + duck.r) {
-            game.pushDuck(side, { x: pin.x, y: pin.y, strength: 1.25 });
-        }
+    const duck = world.boss;
+    if (pin.z < 40 && Math.hypot(duck.x - pin.x, duck.y - pin.y) < BOMB_RADIUS + duck.r) {
+        game.pushDuck(pin.court, { x: pin.x, y: pin.y, strength: 1.25 });
     }
 }
 
-// Each duck has independent attack warning limits. Pins can retarget between attacks.
+// Each court supplies its duck, hazards and attack warning limits to the campaign behavior.
 function targetWorld(game, side, pins) {
     const state = game.pinState.targets[side];
     return {
         boss: game.players[side].boss,
         enemies: pins,
-        arena: game.arena,
+        arena: game.courts[side],
         threatMode: true,
         combatClock: state.clock,
         pinBlastStats: state.blastStats,
         enemyProjectileStats: state.projectileStats,
-        enemyProjectiles: game.projectiles.filter((p) => p.targetSide === side),
+        enemyProjectiles: game.projectiles.filter((p) => p.court === side),
         get nextProjectileWarningAtMs() {
             return state.projectileWarningAtMs;
         },
@@ -291,7 +298,7 @@ function targetWorld(game, side, pins) {
             game.pinState.projectileSerial = value;
         },
         damageBoss: (_amount, _source, impact) => game.pushDuck(side, impact),
-        fx: (...args) => game.fx(...args),
+        fx: (...args) => game.fxOnCourt(side, ...args),
     };
 }
 
@@ -303,8 +310,7 @@ export function stepDuelPins(game, dt) {
     const groups = [[], []];
     for (const pin of game.pins) {
         if (game.clock.nowMs >= pin.expiresAtMs) continue;
-        pin.targetSide = targetFor(pin, ducks);
-        groups[pin.targetSide].push(pin);
+        groups[pin.court].push(pin);
     }
     const worlds = groups.map((pins, side) => targetWorld(game, side, pins));
     const duckPoints = ducks.map((duck) => ({
@@ -313,15 +319,16 @@ export function stepDuelPins(game, dt) {
         z: duck.recoil?.z ?? 0,
     }));
     for (const [side, world] of worlds.entries()) {
-        for (const pin of world.enemies) stepPin(pin, game, world, dt);
-        for (const projectile of world.enemyProjectiles) projectile.targetSide = side;
+        for (const pin of world.enemies) stepPin(pin, world, dt);
+        for (const projectile of world.enemyProjectiles) projectile.court = side;
         stepEnemyProjectiles(world, dt, state.previousDucks?.[side] ?? duckPoints[side]);
     }
     state.previousDucks = duckPoints;
     game.projectiles = worlds.flatMap((world) => world.enemyProjectiles);
-    game.pins = game.pins.filter((pin) => game.clock.nowMs < pin.expiresAtMs);
-    for (const pin of game.pins) explodeBomb(pin, game, dt);
-    game.pins = game.pins.filter(
-        (pin) => pin.deadAge < 1.3 || (pin.fuse !== null && !pin.exploded),
+    for (const world of worlds) for (const pin of world.enemies) explodeBomb(pin, game, world, dt);
+    const liveGroups = groups.map((pins) =>
+        pins.filter((pin) => pin.deadAge < 1.3 || (pin.fuse !== null && !pin.exploded)),
     );
+    game.pins = liveGroups.flat();
+    return liveGroups;
 }
