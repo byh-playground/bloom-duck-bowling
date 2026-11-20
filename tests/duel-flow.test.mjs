@@ -1,51 +1,51 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DuelGame } from '../src/domain/duel.mjs';
+import { createDuelBot } from '../src/domain/duel-bot.mjs';
+import { DuelGame, DUEL_SCORE_GOAL } from '../src/domain/duel.mjs';
 
 const seed = 42;
-const attack = (tick) => [
-    {
-        moveX: 0,
-        moveY: -1,
-        ...(tick % 48 === 15 && { shot: { vx: 0, vy: -950, spin: 0 } }),
-    },
-    { moveX: 0, moveY: 0 },
-];
 
 test('a two-player match ends and replays identically from a mid-game checkpoint', () => {
-    const game = new DuelGame(seed);
+    const matchSeed = 7;
+    const game = new DuelGame(matchSeed);
+    const drivers = [createDuelBot(), createDuelBot()];
+    const act = () => drivers.map((driver, side) => driver(game, side));
     assert.equal(game.result, null);
     assert.deepEqual(
         game.players.map((player) => player.balls.length),
         [3, 3],
     );
     assert.equal(game.players[0].selectedType, game.players[1].selectedType);
-    game.step(attack(0));
+    game.step(act());
     for (const side of [0, 1]) {
         const wave = game.pins.filter((pin) => pin.side === side);
         assert.equal(wave.filter((pin) => pin.kind === 'grunt').length, 15);
         assert.equal(wave.filter((pin) => pin.kind !== 'grunt').length, 1);
     }
-    for (let tick = 1; tick < 145; tick++) game.step(attack(tick));
+    while (game.tick < 4000 && game.result === null) game.step(act());
     const snapshot = game.exportState();
+    assert.equal(snapshot.result, null);
     assert.ok(game.players[0].stats.shots > 0);
     assert.ok(game.pins.some((pin) => pin.side === 1));
 
-    const replay = new DuelGame(seed);
+    const replay = new DuelGame(matchSeed);
     const crossed = structuredClone(snapshot);
     crossed.players[0].boss.y = game.centerLane.y;
     assert.throws(() => replay.importState(crossed), /Invalid Duck Bowling duel snapshot/);
     replay.importState(snapshot);
     assert.deepEqual(replay.exportState(), snapshot);
-    for (let tick = snapshot.tick; tick < 1800 && game.result === null; tick++) {
-        game.step(attack(tick));
-        replay.step(attack(tick));
+    while (game.tick < 6500 && game.result === null) {
+        const actions = act();
+        game.step(actions);
+        replay.step(actions);
         const { y, halfWidth } = game.centerLane;
         const [host, guest] = game.players.map((player) => player.boss);
         assert.ok(host.y - host.r >= y + halfWidth);
         assert.ok(guest.y + guest.r <= y - halfWidth);
     }
-    assert.notEqual(game.result, null);
+    assert.equal(game.result, 0);
+    assert.ok(game.players[0].score >= DUEL_SCORE_GOAL);
+    assert.ok(game.players[1].kills > game.players[1].score);
     assert.deepEqual(replay.exportState(), game.exportState());
 });
 

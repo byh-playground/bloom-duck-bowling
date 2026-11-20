@@ -22,9 +22,9 @@ const DASH_REACH = MANUAL.burstSpeed * MANUAL.burstDuration;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const distanceTo = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
-function nearestThreat(pins, side, duck) {
+function nearestEnemyPin(pins, side, duck) {
     let nearest = null;
-    let distance = PRACTICE.defendDistance;
+    let distance = Infinity;
     for (const pin of pins) {
         if (pin.side === side || pin.hp <= 0 || pin.z > 60) continue;
         const candidateDistance = distanceTo(duck, pin);
@@ -121,7 +121,7 @@ export function createDuelBot() {
             return IDLE;
         nextDecisionMs = nowMs + PRACTICE.reactionMs;
 
-        const threat = nearestThreat(game.pins, side, duck);
+        const targetPin = nearestEnemyPin(game.pins, side, duck);
         const canDash = player.dashCharges > 0 && duckDashOpen(duck);
         const canShoot = duckAimOpen(duck) && player.balls.some((ball) => ball.ready && ball.held);
         const incoming = canDash && nowMs >= nextDodgeMs && incomingPosition(duck, opponent.balls);
@@ -140,19 +140,19 @@ export function createDuelBot() {
             nextShotMs = nowMs + PRACTICE.shotIntervalMs;
             return aimedShot(
                 player,
-                threat ?? opponent.boss,
+                targetPin ?? opponent.boss,
                 (draw.value - 0.5) * PRACTICE.aimError,
             );
         }
 
         if (canDash && nowMs >= nextRepositionMs) {
             nextRepositionMs = nowMs + PRACTICE.repositionMs;
-            if (threat && !canShoot) {
+            if (targetPin && !canShoot && distanceTo(duck, targetPin) < PRACTICE.defendDistance) {
                 const escape = safeDash(
                     player,
-                    duck.x + (duck.x - threat.x),
-                    duck.y + (duck.y - threat.y),
-                    threat,
+                    duck.x + (duck.x - targetPin.x),
+                    duck.y + (duck.y - targetPin.y),
+                    targetPin,
                 );
                 if (escape) return escape;
             }

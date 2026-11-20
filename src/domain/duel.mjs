@@ -13,6 +13,7 @@ import { reflectorOverlaps, restoreReflector } from './terrain.mjs';
 import { PHYSICS_STEP_SECONDS, STEP_SECONDS } from './timing.mjs';
 
 const DUEL_ROUTE = 'storm';
+export const DUEL_SCORE_GOAL = 300;
 const START_INSET = 95;
 const CENTER_LANE_HALF_WIDTH = 40;
 const CONTACT_EPSILON = 1e-6;
@@ -33,6 +34,7 @@ class DuelPlayer extends BowlingGame {
         this.match = match;
         this.side = side;
         this.kills = 0;
+        this.score = 0;
         this.bag = new BallBag(seed, true);
         this.selectedType = this.bag.draw();
         this.controlMode = 'manual';
@@ -134,6 +136,7 @@ function packPlayer(player) {
         balls,
         bag: player.bag.snapshot(),
         kills: player.kills,
+        score: player.score,
         dashCharges: player.dashCharges,
         dashRechargeRemaining: player.dashRechargeRemaining,
         selectedType: player.selectedType,
@@ -152,6 +155,7 @@ function applyPlayer(player, packed, field, time) {
     const { boss, balls, bag } = packed;
     Object.assign(player, {
         kills: packed.kills,
+        score: packed.score,
         dashCharges: packed.dashCharges,
         dashRechargeRemaining: packed.dashRechargeRemaining,
         selectedType: packed.selectedType,
@@ -174,9 +178,12 @@ const isPosition = (body) =>
     Number.isFinite(body?.x) && Number.isFinite(body?.y) && Number.isFinite(body?.r) && body.r > 0;
 
 function duelResult(host, guest) {
-    if (host.hp > 0 && guest.hp > 0) return null;
-    if (host.hp <= 0 && guest.hp <= 0) return 'draw';
-    return host.hp > 0 ? 0 : 1;
+    const hostReached = host.score >= DUEL_SCORE_GOAL;
+    const guestReached = guest.score >= DUEL_SCORE_GOAL;
+    if (hostReached && guestReached) return 'draw';
+    if (hostReached) return 0;
+    if (guestReached) return 1;
+    return null;
 }
 
 function validPlayer(packed, side, player) {
@@ -186,11 +193,12 @@ function validPlayer(packed, side, player) {
         packed.boss.r === player.boss.r &&
         packed.boss.y >= player.duckBounds.minY &&
         packed.boss.y <= player.duckBounds.maxY &&
-        Number.isFinite(packed.boss.hp) &&
-        packed.boss.hp >= 0 &&
-        packed.boss.hp <= DUCK_COMBAT.maxHp &&
+        packed.boss.hp === DUCK_COMBAT.maxHp &&
         Number.isSafeInteger(packed.kills) &&
         packed.kills >= 0 &&
+        Number.isSafeInteger(packed.score) &&
+        packed.score >= 0 &&
+        packed.score <= packed.kills &&
         Number.isInteger(packed.dashCharges) &&
         Number.isFinite(packed.dashRechargeRemaining) &&
         Object.hasOwn(BALL_TYPES, packed.selectedType) &&
@@ -272,17 +280,11 @@ export class DuelGame {
     hurtPin(pin, amount, side, impact = {}) {
         return hurtDuelPin(this, pin, { damage: amount, side, ...impact });
     }
-    hurtDuck(side, amount, impact) {
+    pushDuck(side, impact) {
         const player = this.players[side];
-        const duck = player?.boss;
-        if (!duck || duck.hp <= 0 || !Number.isFinite(amount) || amount <= 0) return false;
-        const damage = Math.min(duck.hp, amount);
-        duck.hp -= damage;
-        duck.flash = 0.18;
-        duck.hurtAge = 0;
-        duck.lastDamage = { amount: damage, source: impact?.source ?? 'duel', time: this.time };
-        startDuckRecoil(player, impact);
-        this.fx('hit', duck.x, duck.y, 20, duck.r * 0.5, '#ee987b');
+        if (!player || !startDuckRecoil(player, impact)) return false;
+        const duck = player.boss;
+        this.fx('hit', duck.x, duck.y, 20, duck.r * 0.5, '#d3e7d8');
         return true;
     }
     restoreReflectors() {
@@ -325,15 +327,13 @@ export class DuelGame {
         ball.duckContact = true;
         if (
             closing <= 0 ||
-            target.hp <= 0 ||
-            !startDuckRecoil(player, {
+            !this.pushDuck(side, {
                 x: ball.x,
                 y: ball.y,
                 direction: Math.atan2(ny, nx),
             })
         )
             return;
-        this.fx('hit', target.x, target.y, 20, target.r * 0.5, '#d3e7d8');
         const impulse = closing * (1 + DUCK_RESTITUTION);
         ball.vx -= nx * impulse;
         ball.vy -= ny * impulse;
@@ -388,7 +388,7 @@ export class DuelGame {
 
         this.tick++;
         this.clock.nowMs = Math.floor(this.tick * STEP_SECONDS * 1000 + 1e-9);
-        this.result = duelResult(this.players[0].boss, this.players[1].boss);
+        this.result = duelResult(this.players[0], this.players[1]);
     }
     exportState() {
         return structuredClone({
@@ -413,7 +413,7 @@ export class DuelGame {
             Array.isArray(state.players) &&
             state.players.length === 2 &&
             state.players.every((player, side) => validPlayer(player, side, this.players[side])) &&
-            state.result === duelResult(state.players[0].boss, state.players[1].boss) &&
+            state.result === duelResult(state.players[0], state.players[1]) &&
             Array.isArray(state.pins) &&
             state.pins.every(
                 (pin) =>
